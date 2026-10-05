@@ -1,0 +1,50 @@
+# Abhängigkeiten
+node_modules/
+
+# Build-Ausgaben
+dist/
+dist-ssr/
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Installer und Pakete
+*.exe
+*.msi
+*.nsis
+*.zip
+
+# itch.io-Upload-Material (Installer, Texte, Grafiken liegen dort lokal)
+release/
+
+# Export-/Sicherungsdateien der App
+taskwood-backup-*.json
+taskmanager-export*.json
+*-export.json
+*-backup.json
+Taskwood-Datensicherung/
+pruef-*.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Lokale Dateien
+*.local
+.env
+.env.*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

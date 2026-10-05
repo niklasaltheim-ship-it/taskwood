@@ -1,0 +1,1287 @@
+/* ---------- Aufgaben: Zusatzinfos nur, wenn gesetzt ---------- */
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+}
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+.due {
+  font-variant-numeric: tabular-nums;
+}
+.due.today {
+  color: var(--accent);
+  font-weight: 600;
+}
+.due.late {
+  color: var(--danger);
+}
+.task.late {
+  background: linear-gradient(to right, color-mix(in srgb, var(--danger) 7%, transparent), transparent 70%);
+}
+.note-toggle {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.note-toggle::after {
+  content: " ▸";
+  font-size: 9px;
+}
+.note-toggle.on::after {
+  content: " ▾";
+}
+.note-toggle:hover {
+  color: var(--accent);
+}
+.note {
+  margin: 3px 0 2px 28px;
+  padding: 3px 8px;
+  border-left: 2px solid var(--line);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.sub .note {
+  margin-left: 24px;
+}
+.edit {
+  width: 100%;
+  margin: -2px 0;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: #fff;
+}
+
+/* Erkanntes Datum / Priorität unter dem Eingabefeld */
+.hint {
+  display: flex;
+  gap: 10px;
+  margin: 5px 4px 0;
+  font-size: 12px;
+  color: var(--accent);
+}
+.hint-prio,
+.prio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hint i,
+.prio-btn i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1px solid rgba(51, 61, 41, 0.35);
+}
+
+/* Details: Datum, Priorität, Notiz */
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 2px 28px;
+  padding: 8px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--soft) 10%, #fff);
+  font-size: 12.5px;
+  animation: menu-in 0.14s ease-out;
+}
+.sub .details {
+  margin-left: 24px;
+}
+.d-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.d-row > span {
+  width: 54px;
+  color: var(--muted);
+}
+.d-row input[type="date"] {
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 12.5px;
+}
+.d-row input[type="date"]:focus {
+  border-color: var(--accent);
+}
+.d-clear {
+  color: var(--muted);
+  font-size: 15px;
+}
+.d-clear:hover {
+  color: var(--danger);
+}
+.prios {
+  display: flex;
+  gap: 3px;
+}
+.prio-btn {
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  color: var(--muted);
+}
+.prio-btn:hover {
+  background: rgba(101, 109, 74, 0.1);
+}
+.prio-btn.on {
+  border-color: var(--accent);
+  background: #fff;
+}
+.d-note {
+  width: 100%;
+  resize: vertical;
+  min-height: 40px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  outline: none;
+}
+.d-note:focus {
+  border-color: var(--accent);
+}
+.d-note::placeholder {
+  color: var(--muted);
+}
+
+/* Sortieren per Ziehen */
+.card.sorting,
+.card.sorting * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.task.dragging,
+.sub.dragging {
+  position: relative;
+  z-index: 1;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 3px 12px rgba(51, 61, 41, 0.22);
+  transition: none;
+}
+
+/* Rückgängig nach dem Abhaken */
+.toast {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #f4f0e4;
+  font-size: 13px;
+  box-shadow: 0 6px 18px rgba(51, 61, 41, 0.3);
+  animation: toast-in 0.18s ease-out;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+.toast-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toast button {
+  padding: 3px 9px;
+  border-radius: 7px;
+  color: #c2c5aa;
+  font-weight: 600;
+}
+.toast button:hover {
+  background: rgba(244, 240, 228, 0.12);
+}
+
+/* ---------- Öffnen und Schließen ---------- */
+
+.card {
+  transform-origin: 30px 24px;
+  animation: card-in 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+.card.closing {
+  animation: card-out 0.16s ease-in forwards;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: scale(0.88); }
+}
+@keyframes card-out {
+  to { opacity: 0; transform: scale(0.9); }
+}
+.mini .pet {
+  animation: pop-in 0.26s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.7); }
+}
+
+/* ---------- Tier: Ruhe, Freude, Halten, Alarm ---------- */
+
+/* Gehalten am Nackenfell: Drehpunkt oben (useDangle setzt die Drehung) */
+.pet,
+.bar-pet {
+  transform-origin: 50% 0;
+}
+.ani .a-all,
+.ani .a-turn,
+.ani .a-tail,
+.ani .a-ear {
+  transform-box: view-box;
+}
+.ani .a-all {
+  transform-origin: 12px 19px;
+}
+.ani .a-turn {
+  transform-origin: 12px 10px;
+}
+
+/* Atmen: zwei Stufen statt fließend, passt zu den Pixeln und spart Neuzeichnen */
+.ani .a-all {
+  animation: breathe 3.6s steps(1, end) infinite;
+}
+.ani.asleep .a-all {
+  animation-duration: 5s;
+}
+@keyframes breathe {
+  0% { transform: none; }
+  50% { transform: scale(1.015, 1.035); }
+}
+
+/* Umschauen: kurz über die Schulter */
+.ani.a-look .a-turn {
+  animation: look 1.1s steps(1, end);
+}
+@keyframes look {
+  0% { transform: none; }
+  25% { transform: scaleX(-1); }
+  70% { transform: none; }
+}
+
+.ani.a-wag .a-tail,
+.ani.m-happy .a-tail {
+  animation: wag 0.9s ease-in-out;
+}
+@keyframes wag {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-9deg); }
+  45% { transform: rotate(7deg); }
+  70% { transform: rotate(-5deg); }
+}
+
+.ani.a-ear .a-ear {
+  animation: twitch 0.6s steps(1, end);
+}
+@keyframes twitch {
+  0%, 100% { transform: none; }
+  15%, 45% { transform: scaleY(var(--ear-s, 1.3)); }
+  30% { transform: none; }
+}
+
+/* Maus drüber: kleiner Hüpfer, schaut hoch */
+.ani.m-happy {
+  animation: happy 0.45s ease-out;
+}
+@keyframes happy {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-7%); }
+}
+.ani.m-happy .a-all {
+  animation: none;
+  transform: rotate(-4deg);
+  transition: transform 0.2s;
+}
+
+/* Wird verschoben: kein Atmen, Schwanz hängt leicht */
+.ani.m-held .a-all {
+  animation: none;
+}
+.ani.m-held .a-tail {
+  transform: rotate(10deg);
+  transition: transform 0.2s;
+}
+
+/* Abfedern nach dem Loslassen */
+.land .ani {
+  animation: land 0.42s cubic-bezier(0.3, 1.6, 0.5, 1);
+  transform-origin: 50% 100%;
+}
+@keyframes land {
+  0% { transform: scale(1.06, 0.88); }
+  55% { transform: scale(0.97, 1.04); }
+  100% { transform: none; }
+}
+
+/* Timer abgelaufen: hüpft und winkt */
+.ani.m-alarm {
+  animation: alarm 1.4s ease-in-out infinite;
+}
+@keyframes alarm {
+  0%, 60%, 100% { transform: translateY(0); }
+  12% { transform: translateY(-12%); }
+  24% { transform: translateY(0); }
+  36% { transform: translateY(-7%); }
+  48% { transform: translateY(0); }
+}
+.ani.m-alarm .a-all {
+  animation: none;
+}
+.ani.m-alarm .a-tail {
+  animation: wag 0.7s ease-in-out infinite;
+}
+.ani.m-alarm .a-ear {
+  animation: twitch 0.7s steps(1, end) infinite;
+}
+.bang {
+  animation: zz 0.7s steps(1, end) infinite;
+}
+
+/* ---------- Reduzierte Bewegung ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card.closing,
+  .mini .pet,
+  .menu,
+  .timer,
+  .details,
+  .toast,
+  .ani,
+  .ani *,
+  .land .ani,
+  .zz,
+  .sweat,
+  .bang,
+  .bar-pet.hop {
+    animation: none !important;
+    transition: none !important;
+  }
+  .ani.m-happy .a-all,
+  .ani.m-held .a-tail {
+    transform: none;
+  }
+}
+
+/* ---------- Tier-Engine (Leinwand) ---------- */
+
+.pet-canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+.mini {
+  position: relative;
+  align-items: flex-end;
+  padding-bottom: 4px;
+}
+/* Anzahl und Timer-Ring sitzen am Kopf bzw. an den Füßen, nicht an der (höheren) Leinwand */
+.mini .badge.big {
+  top: 36px;
+  right: 22px;
+}
+.mini .ring {
+  left: 8px;
+  bottom: 6px;
+}
+.bar-pet .pet-canvas {
+  margin: -10px -2px -4px;
+}
+.bar-pet .badge {
+  top: 2px;
+  right: -6px;
+}
+.crumb .pet-canvas,
+.m-main .pet-canvas {
+  flex-shrink: 0;
+}
+.alarm .pet-canvas {
+  margin: -12px 0 -6px;
+}
+
+/* ---------- Sprechblase ---------- */
+
+.bubble {
+  position: absolute;
+  z-index: 6;
+  top: 2px;
+  left: 50%;
+  max-width: 124px;
+  padding: 3px 8px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: #fbfaf3;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: bubble 2.8s ease-out forwards;
+}
+.bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-right: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  background: #fbfaf3;
+  transform: rotate(45deg);
+}
+.bubble.in-bar {
+  top: 10px;
+  left: 54px;
+  transform: none;
+}
+.bubble.in-bar::after {
+  left: -3px;
+  top: 50%;
+  bottom: auto;
+  margin: -4px 0 0;
+  transform: rotate(135deg);
+}
+@keyframes bubble {
+  0% { opacity: 0; translate: 0 4px; }
+  8%, 85% { opacity: 1; translate: 0 0; }
+  100% { opacity: 0; }
+}
+
+.m-setting {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 6px 8px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.m-setting input {
+  accent-color: var(--accent);
+}
+
+/* ---------- Testansicht ---------- */
+
+.lab {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--surface);
+}
+.lab-head strong {
+  white-space: nowrap;
+}
+.lab-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--strong);
+}
+.lab-head select {
+  padding: 3px 6px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+}
+.lab-stage {
+  display: grid;
+  place-items: center;
+  padding: 4px 0;
+  border-radius: 10px;
+  background: repeating-conic-gradient(#efece0 0 25%, #f7f5ee 0 50%) 0 0 / 16px 16px;
+}
+.lab-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.lab-group > span {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.chip.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.chip.small {
+  padding: 2px 7px;
+  font-size: 11.5px;
+}
+.lab-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation: none;
+  }
+}
+
+/* Der Jubel-Clip ersetzt den alten Hüpfer */
+.bar-pet.hop:has(.pet-canvas) {
+  animation: none;
+}
+
+/* ---------- Stundenplan ---------- */
+
+.timetable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tt-head {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.tt-day {
+  min-width: 34px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+.tt-day:hover {
+  background: rgba(101, 109, 74, 0.1);
+}
+.tt-day.today {
+  color: var(--strong);
+  border-color: var(--line);
+}
+.tt-day.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.tt-label {
+  color: var(--strong);
+}
+.tt-toggle {
+  padding: 3px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tt-toggle:hover {
+  border-color: var(--accent);
+  color: var(--strong);
+}
+.tt-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tt-lunch {
+  padding: 2px 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* Vorlesungskarte */
+.lec {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 10px 7px 12px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--lec) 35%, transparent);
+  background: color-mix(in srgb, var(--lec) 14%, #fff);
+  text-align: left;
+  cursor: default;
+  overflow: hidden;
+}
+.lec::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--lec);
+}
+.lec.linked {
+  cursor: pointer;
+}
+.lec.linked:hover {
+  border-color: var(--lec);
+}
+.lec:disabled {
+  color: inherit;
+}
+.lec-title {
+  font-weight: 600;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--lec) 70%, #1c2416);
+}
+.lec-meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.lec.past {
+  opacity: 0.5;
+}
+.lec.now {
+  border-color: var(--lec);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lec) 30%, transparent);
+}
+.lec-now {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--lec);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+/* Wochenraster */
+.tt-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tt-days,
+.tt-cols {
+  display: grid;
+  grid-template-columns: 38px repeat(5, 1fr);
+  gap: 5px;
+}
+.tt-days span {
+  text-align: center;
+  font-weight: 600;
+  color: var(--muted);
+}
+.tt-days span.today {
+  color: var(--strong);
+}
+.tt-cols {
+  position: relative;
+}
+.tt-axis {
+  position: relative;
+}
+.tt-axis span {
+  position: absolute;
+  right: 4px;
+  font-size: 10.5px;
+  color: var(--muted);
+  transform: translateY(-50%);
+  font-variant-numeric: tabular-nums;
+}
+.tt-axis span:first-child {
+  transform: none;
+}
+.tt-col {
+  position: relative;
+  border-radius: 8px;
+}
+.tt-col.today {
+  background: color-mix(in srgb, var(--soft) 18%, transparent);
+}
+.tt-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
+}
+.tt-lunchband {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 6px;
+  background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--line) 50%, transparent) 5px 7px);
+}
+.tt-nowline {
+  position: absolute;
+  left: -3px;
+  right: 0;
+  z-index: 1;
+  border-top: 2px solid var(--danger);
+}
+.tt-nowline::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.week .lec {
+  left: 0;
+  padding: 4px 6px 4px 9px;
+  font-size: 12px;
+}
+.week .lec-meta {
+  font-size: 10.5px;
+}
+.week .lec-now {
+  top: auto;
+  bottom: 4px;
+  right: 4px;
+}
+
+.bar-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Stundenplan bearbeiten ---------- */
+
+.tt-toggle.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.lec.editable {
+  cursor: pointer;
+  border-style: dashed;
+}
+.lec.editable:hover {
+  border-style: solid;
+  border-color: var(--lec);
+}
+.lec-edit {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: var(--lec);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.8;
+}
+.tt-add {
+  align-self: flex-start;
+}
+.tt-days span {
+  position: relative;
+}
+.tt-plus {
+  margin-left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  color: var(--accent);
+  font-weight: 700;
+  line-height: 1;
+}
+.tt-plus:hover {
+  background: rgba(101, 109, 74, 0.14);
+}
+.timetable .overlay {
+  z-index: 8;
+}
+.timetable .dialog {
+  max-width: 330px;
+}
+.field-row {
+  display: flex;
+  gap: 8px;
+}
+.field-row .field {
+  flex: 1;
+  min-width: 0;
+}
+.field select,
+.field input[type="time"] {
+  width: 100%;
+}
+.field-error {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.swatch.on {
+  border-color: var(--surface);
+  outline: 2px solid var(--strong);
+}
+.lec.editable .lec-title {
+  padding-right: 12px;
+}
+
+/* ---------- Planer: Monat | Stundenplan ---------- */
+
+.plan-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.plan-tabs button {
+  padding: 4px 12px 5px;
+  border-radius: 8px 8px 0 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+.plan-tabs button:hover {
+  color: var(--text);
+}
+.plan-tabs button.on {
+  color: var(--strong);
+  background: var(--surface);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* ---------- Kalender ---------- */
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cal-month {
+  min-width: 120px;
+  text-align: center;
+  color: var(--strong);
+  text-transform: capitalize;
+}
+.cal-nav {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--accent);
+  font-size: 18px;
+  line-height: 1;
+}
+.cal-nav:hover {
+  background: rgba(101, 109, 74, 0.12);
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-wd {
+  padding-bottom: 2px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.cal-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 38px;
+  padding: 3px 0 4px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+.cal-cell:hover {
+  background: rgba(101, 109, 74, 0.1);
+}
+.cal-cell.weekend .cal-num {
+  color: var(--muted);
+}
+.cal-cell.out {
+  opacity: 0.4;
+}
+.cal-num {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.cal-cell.today .cal-num {
+  min-width: 20px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.cal-cell.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--soft) 22%, #fff);
+}
+.cal-exam {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: #8e3b34;
+  transform: rotate(45deg);
+}
+.cal-dots {
+  display: flex;
+  gap: 2px;
+  min-height: 5px;
+}
+.dot {
+  display: block;
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.dot-task {
+  background: var(--accent);
+}
+.dot-late {
+  background: var(--danger);
+}
+.dot-ev {
+  background: var(--strong);
+  opacity: 0.55;
+}
+
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.cal-day-head {
+  display: flex;
+  align-items: center;
+  color: var(--strong);
+}
+.cal-day-head .m-add {
+  margin: 0;
+  padding: 3px 8px;
+}
+.cal-empty {
+  margin: 2px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cal-item {
+  --lec: var(--accent);
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  column-gap: 8px;
+  width: 100%;
+  padding: 5px 8px 5px 11px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--lec) 30%, transparent);
+  background: color-mix(in srgb, var(--lec) 10%, #fff);
+  text-align: left;
+}
+.cal-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 8px 0 0 8px;
+  background: var(--lec);
+}
+button.cal-item:hover {
+  border-color: var(--lec);
+}
+.cal-item.cal-task {
+  --lec: var(--soft);
+}
+.cal-item.cal-task.cal-late {
+  --lec: var(--danger);
+}
+.cal-time {
+  grid-row: span 2;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cal-title {
+  font-weight: 600;
+  line-height: 1.25;
+  word-break: break-word;
+}
+.cal-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.cal-sub:empty {
+  display: none;
+}
+.cal-badge {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: #8e3b34;
+  color: #fff;
+  font-size: 10.5px;
+  line-height: 15px;
+  vertical-align: 1px;
+}
+.calendar .overlay {
+  z-index: 8;
+}
+.calendar .dialog {
+  max-width: 330px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.check-row input {
+  accent-color: var(--accent);
+}
+
+/* ---------- Prüfungs-Countdown ---------- */
+
+.exam-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--soft) 16%, var(--bg));
+  text-align: left;
+  flex-shrink: 0;
+}
+.exam-banner:hover {
+  background: color-mix(in srgb, var(--soft) 28%, var(--bg));
+}
+.exam-banner svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.exam-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.exam-count {
+  font-size: 12px;
+  color: var(--strong);
+  white-space: nowrap;
+}
+.exam-banner.soon {
+  background: color-mix(in srgb, #8e3b34 12%, var(--bg));
+}
+.exam-banner.soon .exam-count {
+  color: #8e3b34;
+}
+.exam-more {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--line);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Wiederkehrende Aufgaben */
+.repeat {
+  color: var(--accent);
+}
+.d-select {
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+/* ---------- Termin beginnt ---------- */
+
+.appt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, #b4483a 12%, var(--bg));
+  flex-shrink: 0;
+}
+.appt .pet-canvas {
+  margin: -12px 0 -6px;
+}
+.appt-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.appt-text b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--strong);
+}
+.appt-text span {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.appt .btn {
+  padding: 3px 9px;
+}
+
+/* ---------- Sicherung ---------- */
+
+.m-backup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.m-backup .m-add {
+  margin-top: 2px;
+  font-size: 12.5px;
+}
+.m-add.danger {
+  color: var(--danger);
+}
+.m-note {
+  margin: 2px 8px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- Einstellungen, Über ---------- */
+
+.settings {
+  max-height: 100%;
+  overflow-y: auto;
+}
+.settings.wide-text {
+  height: 100%;
+}
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.settings-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text);
+}
+.about-line {
+  margin: -6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.about-text {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  user-select: text;
+}
+.license-text {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 10.5px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+.m-settings {
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+}

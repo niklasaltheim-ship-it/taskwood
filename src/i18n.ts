@@ -1,0 +1,327 @@
+// Übersetzung: Der deutsche Text ist der Schlüssel, EN enthält die englische Fassung.
+// Platzhalter {name}. Ein Zusatz nach "|" unterscheidet gleiche deutsche Wörter mit
+// unterschiedlicher Bedeutung (z. B. "Ordner|Feld") und wird im Deutschen nicht angezeigt.
+// Fehlt eine Übersetzung, erscheint der deutsche Text.
+
+export type Lang = "de" | "en";
+export type LangSetting = "auto" | Lang;
+
+export const systemLang = (): Lang => ((navigator.language || "").toLowerCase().startsWith("de") ? "de" : "en");
+
+let current: Lang = "de";
+
+export function setLang(l: LangSetting) {
+  current = l === "auto" ? systemLang() : l;
+  try {
+    document.documentElement.lang = current;
+  } catch {}
+}
+
+export const lang = () => current;
+export const locale = () => (current === "de" ? "de-DE" : "en-US");
+
+export function t(de: string, params?: Record<string, string | number>) {
+  let s = current === "en" ? EN[de] ?? de.split("|")[0] : de.split("|")[0];
+  if (params) for (const [k, v] of Object.entries(params)) s = s.split(`{${k}}`).join(String(v));
+  return s;
+}
+
+// Sprache sofort beim Laden setzen (vor dem ersten Rendern und vor dem Anlegen von Startdaten).
+// Ohne gespeicherte Wahl: Englisch.
+try {
+  const s = JSON.parse(localStorage.getItem("taskwood-settings") || "{}");
+  setLang(s.language === "de" || s.language === "en" || s.language === "auto" ? s.language : "en");
+} catch {
+  setLang("en");
+}
+
+const EN: Record<string, string> = {
+  // ---------- Allgemein ----------
+  Heute: "Today",
+  Gestern: "Yesterday",
+  Morgen: "Tomorrow",
+  heute: "today",
+  morgen: "tomorrow",
+  "um {time}": "at {time}",
+  OK: "OK",
+  Abbrechen: "Cancel",
+  Speichern: "Save",
+  Anlegen: "Create",
+  Löschen: "Delete",
+  "Wirklich löschen?": "Really delete?",
+  Nein: "No",
+  Bearbeiten: "Edit",
+  Fertig: "Done",
+  Name: "Name",
+  Schließen: "Close",
+
+  // ---------- Kopfzeile, Ansichten ----------
+  Aufgaben: "Tasks",
+  Verlauf: "History",
+  Kalender: "Calendar",
+  Stundenplan: "Timetable",
+  Monat: "Month",
+  Timer: "Timer",
+  "Zurück zu den Aufgaben": "Back to tasks",
+  "Kalender und Stundenplan": "Calendar and timetable",
+  "Verlauf anzeigen": "Show history",
+  "Fenster verkleinern": "Smaller window",
+  "Fenster vergrößern": "Larger window",
+  Einklappen: "Collapse",
+  "Ordner wechseln": "Switch folder",
+  "Projekt wechseln (Doppelklick zum Bearbeiten)": "Switch project (double-click to edit)",
+  "Kein Projekt": "No project",
+
+  // ---------- Ordner und Projekte ----------
+  Ordner: "Folders",
+  "Ordner|Feld": "Folder",
+  "Projekte in {folder}": "Projects in {folder}",
+  "Timer läuft": "Timer running",
+  "{name} bearbeiten": "Edit {name}",
+  "+ Neues Projekt": "+ New project",
+  "+ Neuer Ordner": "+ New folder",
+  "Name, z. B. Arbeit": "Name, e.g. Work",
+  "„{name}“ löschen?": "Delete “{name}”?",
+  "„{name}“ mit 1 Projekt löschen?": "Delete “{name}” with 1 project?",
+  "„{name}“ mit {n} Projekten löschen?": "Delete “{name}” with {n} projects?",
+  "1 Projekt": "1 project",
+  "{n} Projekte": "{n} projects",
+  Umbenennen: "Rename",
+  "{name} umbenennen": "Rename {name}",
+  "{name} löschen": "Delete {name}",
+  "Neues Projekt": "New project",
+  "Neues Projekt in {folder}": "New project in {folder}",
+  "Projekt bearbeiten": "Edit project",
+  "z. B. Mathe, Abschlussarbeit, Einkauf": "e.g. Math, Thesis, Groceries",
+  Tier: "Animal",
+  "In „{folder}“ gibt es noch kein Projekt.": "There is no project in “{folder}” yet.",
+  "Projekt anlegen": "Create project",
+  Projekt: "Project",
+  Allgemein: "General",
+  "Erste Schritte": "Getting started",
+  "Tippe oben eine Aufgabe ein, z. B. „Einkaufen morgen“": "Type a task above, e.g. “groceries tomorrow”",
+  "Hake mich ab: dein Biber freut sich": "Tick me off: your beaver will be happy",
+  "Über das Kalender-Symbol oben findest du Kalender und Stundenplan": "The calendar icon at the top opens calendar and timetable",
+
+  // ---------- Aufgaben ----------
+  "Neue Aufgabe in {name}": "New task in {name}",
+  "Nichts offen. Neue Aufgabe oben eintippen und Enter drücken. Datum geht direkt mit, z. B. „morgen“ oder „Freitag“.":
+    "Nothing open. Type a new task above and press Enter. You can add a date right away, e.g. “tomorrow” or “Friday”.",
+  "Unteraufgabe, Enter zum Hinzufügen": "Subtask, Enter to add",
+  "Als erledigt markieren": "Mark as done",
+  "Doppelklick zum Bearbeiten, ziehen zum Sortieren": "Double-click to edit, drag to reorder",
+  "Überfällig seit ": "Overdue since ",
+  "Fällig: ": "Due: ",
+  "Wiederholt sich {r}": "Repeats {r}",
+  Notiz: "Note",
+  "Unteraufgabe hinzufügen": "Add subtask",
+  "Datum, Priorität, Notiz": "Date, priority, note",
+  "Löschen ohne Erledigen": "Delete without completing",
+  "Aufgabe löschen": "Delete task",
+  Fällig: "Due",
+  "Datum entfernen": "Remove date",
+  Wiederholen: "Repeat",
+  Nie: "Never",
+  Täglich: "Daily",
+  Wöchentlich: "Weekly",
+  Monatlich: "Monthly",
+  täglich: "daily",
+  wöchentlich: "weekly",
+  monatlich: "monthly",
+  Priorität: "Priority",
+  Keine: "None",
+  "Priorität {name}": "Priority {name}",
+  Niedrig: "Low",
+  Mittel: "Medium",
+  Hoch: "High",
+  "Gelöschte Aufgabe": "Deleted task",
+  "Erledigte Aufgaben aus {name} erscheinen hier, sortiert nach Tag.": "Completed tasks from {name} appear here, sorted by day.",
+  "Wirklich leeren?": "Really clear?",
+  "Verlauf leeren": "Clear history",
+  "„{text}“ erledigt": "“{text}” done",
+  Rückgängig: "Undo",
+
+  // ---------- Timer ----------
+  Pause: "Pause",
+  Weiter: "Resume",
+  Start: "Start",
+  "Min.": "Min",
+  "Eigene Dauer in Minuten": "Custom duration in minutes",
+  "Zeit um!": "Time's up!",
+  "Zeit um in {name}!": "Time's up in {name}!",
+  Hin: "Go",
+  "Zeit ist um!": "Time's up!",
+  "Zeit um: {name}": "Time's up: {name}",
+  "Dein {n}-Minuten-Timer ist abgelaufen.": "Your {n}-minute timer has run out.",
+  "Dein {n}-Minuten-Timer ist abgelaufen, während die App geschlossen war.": "Your {n}-minute timer ran out while the app was closed.",
+
+  // ---------- Kleines Tier, Tooltip ----------
+  "{folder}: noch kein Projekt": "{folder}: no project yet",
+  "{name}: Zeit um!": "{name}: time's up!",
+  "{n} offen": "{n} open",
+  "alles erledigt": "all done",
+  " (Pause)": " (paused)",
+  Jetzt: "Now",
+  "Als Nächstes": "Next",
+  "Vorrat diese Woche: {s}": "Stash this week: {s}",
+  "Prüfung {title}: {cd}": "Exam {title}: {cd}",
+
+  // ---------- Sprechblasen ----------
+  "Hallo!": "Hello!",
+  "Da bin ich!": "Here I am!",
+  "Los geht's!": "Let's go!",
+  "Oh, was Neues!": "Ooh, something new!",
+  "Notiert!": "Noted!",
+  "Machen wir!": "Let's do it!",
+  "Geschafft!": "All done!",
+  "Noch {n}!": "{n} to go!",
+  "Super!": "Great!",
+  "Weiter so!": "Keep going!",
+  "Eins weniger!": "One less!",
+  "Puh, ganz schön viel!": "Phew, that's a lot!",
+  "Uff, viel los!": "Busy, busy!",
+  "Wie wär's mit was Kleinem?": "How about something small?",
+  "Eine kurze Aufgabe?": "A quick task?",
+  "Prüfung bald!": "Exam soon!",
+  "Schön, dich zu sehen!": "Good to see you!",
+  "Was steht an?": "What's next?",
+  "Kommt auf die Liste!": "On the list it goes!",
+  "Klingt gut!": "Sounds good!",
+  "Alles erledigt!": "Everything done!",
+  "Feierabend!": "Time to relax!",
+  "Nur noch eine!": "Just one more!",
+  "Stark!": "Awesome!",
+  "Gut gemacht!": "Well done!",
+  "Abgehakt!": "Checked!",
+  "Läuft bei dir!": "You're on a roll!",
+  "Eins nach dem anderen.": "One thing at a time.",
+  "Ein kleiner Schritt?": "One small step?",
+  "Fokus an!": "Focus on!",
+  "Du schaffst das!": "You've got this!",
+  "Ich bin ganz leise.": "I'll be quiet.",
+  "Gleich: {title}": "Coming up: {title}",
+  "Jetzt: {title}": "Now: {title}",
+
+  // ---------- Kalender, Termine, Prüfungen ----------
+  "Prüfung: {title}": "Exam: {title}",
+  "Prüfung {title} · {date}": "Exam {title} · {date}",
+  "Im Kalender zeigen": "Show in calendar",
+  "Vorheriger Monat": "Previous month",
+  "Nächster Monat": "Next month",
+  "+ Termin": "+ Event",
+  "Nichts eingetragen. Doppelklick auf einen Tag legt direkt einen Termin an.": "Nothing planned. Double-click a day to add an event right away.",
+  ganztägig: "all day",
+  Prüfung: "Exam",
+  "mit Erinnerung": "with reminder",
+  fällig: "due",
+  "Zur Aufgabe": "Go to task",
+  "Termin bearbeiten": "Edit event",
+  "Neuer Termin": "New event",
+  Titel: "Title",
+  "z. B. Prüfung Mathe": "e.g. Math exam",
+  Datum: "Date",
+  Ort: "Place",
+  optional: "optional",
+  Ganztägig: "All day",
+  Beginn: "Start",
+  Ende: "End",
+  "Das Ende muss nach dem Beginn liegen.": "The end must be after the start.",
+  "Prüfung (erscheint im Countdown)": "Exam (shown in the countdown)",
+  Keins: "None",
+  Erinnerung: "Reminder",
+  "Zur Startzeit": "At start time",
+  "15 Min. vorher": "15 min before",
+  "1 Std. vorher": "1 hour before",
+  "1 Tag vorher": "1 day before",
+  "noch {n} Tage": "in {n} days",
+
+  // ---------- Stundenplan ----------
+  Woche: "Week",
+  Tag: "Day",
+  "Vorlesungen bearbeiten": "Edit lectures",
+  "Zu Projekt „{name}“ wechseln": "Go to project “{name}”",
+  jetzt: "now",
+  "Vorlesung bearbeiten": "Edit lecture",
+  "Neue Vorlesung": "New lecture",
+  "z. B. Mathe": "e.g. Math",
+  Raum: "Room",
+  "z. B. Raum 101": "e.g. Room 101",
+  "Tag|Feld": "Day",
+  Farbe: "Color",
+  "Farbe {c}": "Color {c}",
+  "Mittagspause {from}–{to}": "Lunch break {from}–{to}",
+  "Wochenende. Hier ist schon mal der Montag:": "It's the weekend. Here is Monday:",
+  "Keine Vorlesungen. Freier Tag!": "No lectures. Day off!",
+  "+ Vorlesung am {day}": "+ Lecture on {day}",
+  "Vorlesung am {day} hinzufügen": "Add lecture on {day}",
+
+  // ---------- Einstellungen, Sicherung, Über ----------
+  Einstellungen: "Settings",
+  "Einstellungen…": "Settings…",
+  Sprache: "Language",
+  "Automatisch ({lang})": "Automatic ({lang})",
+  "Ruhemodus: Tiere bewegen sich nicht": "Calm mode: animals stay still",
+  "Sprechblasen vom Tier": "Speech bubbles from the animal",
+  Datensicherung: "Backup",
+  "Daten exportieren…": "Export data…",
+  "Daten importieren…": "Import data…",
+  "Ersetzt alle Daten. Weiter?": "Replaces all data. Continue?",
+  "Gesichert.": "Saved.",
+  "Export fehlgeschlagen.": "Export failed.",
+  "Daten übernommen.": "Data imported.",
+  "Diese Datei ist keine gültige Sicherung.": "This file is not a valid backup.",
+  "Über Taskwood": "About Taskwood",
+  "Version {v}": "Version {v}",
+  "Lizenz: MIT": "License: MIT",
+  Lizenztext: "License text",
+  "Drittanbieter-Lizenzen": "Third-party licenses",
+  Datenschutz: "Privacy",
+  "Alle Daten bleiben lokal auf deinem Gerät. Die App sendet keine Daten.": "All data stays on your device. The app does not send any data.",
+  Kontakt: "Contact",
+  Zurück: "Back",
+
+  // ---------- Tiere, Vorrat ----------
+  Biber: "Beaver",
+  Fuchs: "Fox",
+  Eichhörnchen: "Squirrel",
+  Waschbär: "Raccoon",
+  Igel: "Hedgehog",
+  Eule: "Owl",
+  Hase: "Rabbit",
+  Holzstück: "piece of wood",
+  Holzstücke: "pieces of wood",
+  Nuss: "nut",
+  Nüsse: "nuts",
+  Apfel: "apple",
+  Äpfel: "apples",
+  Buch: "book",
+  Bücher: "books",
+  Karotte: "carrot",
+  Karotten: "carrots",
+
+  // ---------- Tier-Testansicht ----------
+  "Tier-Testansicht": "Animal test view",
+  Stimmung: "Mood",
+  Ereignis: "Event",
+  "Schläft (0)": "Asleep (0)",
+  "Entspannt (1–3)": "Relaxed (1–3)",
+  "Fleißig (4–7)": "Busy (4–7)",
+  "Gestresst (8+)": "Stressed (8+)",
+  Gelangweilt: "Bored",
+  "Timer abgelaufen": "Timer done",
+  "Termin beginnt": "Event starts",
+  Erledigt: "Done",
+  "Letzte erledigt": "Last one done",
+  "Neue Aufgabe": "New task",
+  "Fenster geöffnet": "Window opened",
+  Losgelassen: "Dropped",
+  "Wird verschoben": "Being moved",
+  "Maus drüber": "Mouse over",
+  "Maus still (anschmiegen)": "Mouse still (cuddle)",
+  "Reduzierte Bewegung": "Reduced motion",
+  "Vorrat ({s})": "Stash ({s})",
+  "(dieses Tier sammelt nichts)": "(this animal does not collect anything)",
+  "Einzelne Clips": "Single clips",
+  "Maus über das Tier bewegen: die Augen folgen. Stillhalten: es schmiegt sich an.":
+    "Move the mouse over the animal: its eyes follow. Hold still: it cuddles up.",
+};
