@@ -3,9 +3,13 @@ import type { AnimalKind } from "./sprites";
 import { sanitizeLectures } from "./schedule";
 import type { Lecture } from "./schedule";
 import { t } from "./i18n";
+import { isAccessory } from "./pet/wear";
+import type { Accessory } from "./pet/wear";
+import { emptyScores, sanitizeScores } from "./game/scores";
+import type { DamScores } from "./game/scores";
 
 export type Folder = { id: string; name: string; last?: string }; // last: zuletzt gewähltes Projekt
-export type Project = { id: string; folderId: string; name: string; animal: AnimalKind };
+export type Project = { id: string; folderId: string; name: string; animal: AnimalKind; wear?: Accessory };
 export type Prio = 1 | 2 | 3;
 export type Repeat = "daily" | "weekly" | "monthly";
 
@@ -22,6 +26,7 @@ export type CalEvent = {
   remind?: number; // Minuten vorher, undefined = keine Erinnerung
   notifiedAt?: number;
   seenAt?: number; // Termin läuft und wurde mit OK bestätigt; das Tier meldet sich dann nicht mehr
+  source?: string; // aus .ics importiert: stabile Kennung, damit erneuter Import nichts verdoppelt
 };
 
 export type Task = {
@@ -49,6 +54,8 @@ export type Data = {
   timers: Record<string, Timer>;
   lectures: Lecture[]; // Stundenplan
   events: CalEvent[]; // Kalender
+  doneTotal: number; // jemals erledigte Aufgaben (schaltet Accessoires frei; bleibt beim Leeren des Verlaufs)
+  dam: DamScores; // Highscores des Spiels "Dammbau"
 };
 
 export const STORE = "taskwood-data";
@@ -64,7 +71,7 @@ function fresh(): Data {
   const tasks: Task[] = [
     "Tippe oben eine Aufgabe ein, z. B. „Einkaufen morgen“",
     "Hake mich ab: dein Biber freut sich",
-    "Über das Kalender-Symbol oben findest du Kalender und Stundenplan",
+    "Das Menü oben rechts öffnet Heute, Suche, Kalender und mehr",
   ].map((text, i) => ({ id: uid(), projectId: project.id, text: t(text), createdAt: now + i, order: i }));
   return {
     version: 2,
@@ -76,6 +83,8 @@ function fresh(): Data {
     timers: {},
     lectures: sanitizeLectures(undefined),
     events: [],
+    doneTotal: 0,
+    dam: emptyScores(),
   };
 }
 
@@ -104,6 +113,8 @@ function migrateV1(d: any): Data {
     timers: {},
     lectures: sanitizeLectures(undefined),
     events: [],
+    doneTotal: 0,
+    dam: emptyScores(),
   };
 }
 
@@ -115,6 +126,7 @@ function sanitize(d: Data): Data {
     ...p,
     folderId: folderIds.has(p.folderId) ? p.folderId : folders[0].id,
     animal: isAnimal(p.animal) ? p.animal : "beaver",
+    wear: isAccessory(p.wear) ? p.wear : undefined,
   }));
   const tasks = (Array.isArray(d.tasks) ? d.tasks : []).map((t, i) => ({
     ...t,
@@ -129,7 +141,9 @@ function sanitize(d: Data): Data {
   const events = (Array.isArray(d.events) ? d.events : []).filter(
     e => e && typeof e.title === "string" && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
   );
-  return { version: 2, folders, projects, activeFolder, activeProject, tasks, timers, lectures, events };
+  // Ältere Stände: Zähler aus dem vorhandenen Verlauf schätzen
+  const doneTotal = typeof d.doneTotal === "number" && d.doneTotal >= 0 ? d.doneTotal : tasks.filter(t => t.doneAt).length;
+  return { version: 2, folders, projects, activeFolder, activeProject, tasks, timers, lectures, events, doneTotal, dam: sanitizeScores(d.dam) };
 }
 
 // Beliebigen gespeicherten oder importierten Stand ins aktuelle Format bringen; null = unbrauchbar

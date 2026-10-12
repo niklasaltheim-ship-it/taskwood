@@ -1,4 +1,4 @@
-import type { Clip, Frame, MoodState, Species } from "./types";
+import type { Arm, Clip, Frame, MoodState, Species } from "./types";
 
 export const repeat = (n: number, f: (i: number) => Frame): Frame[] => Array.from({ length: n }, (_, i) => f(i));
 const times = (n: number, frames: Frame[]): Frame[] => Array.from({ length: n }, () => frames).flat();
@@ -243,6 +243,43 @@ export function baseClips(_sp: Species): Record<string, Clip> {
         props: [["heart1"], ["heart1", "heart3"], ["heart2", "heart3"], ["heart2"], [], [], ["heart3"], ["heart3", "heart1"], ["heart1"]][i],
       })),
     },
+    // ---------- Besuch: zwei Tiere einander zugewandt (L = schaut nach links, R = nach rechts) ----------
+    ...Object.fromEntries(
+      (["L", "R"] as const).flatMap(side => {
+        const d = side === "L" ? -1 : 1;
+        const face: Frame = { turn: d, gaze: [d, 0], hx: d };
+        const arm = (a: Arm): [Arm, Arm] => (side === "L" ? [a, "rest"] : ["rest", a]);
+        const hearts = side === "L" ? [["heart3"], [], ["heart3"], []] : [["heart1"], ["heart2"], ["heart1"], []];
+        const clips: [string, Clip][] = [
+          // Plaudern: Mund geht, kleines Nicken
+          [`talk${side}`, { fps: 6, frames: repeat(18, i => ({ ...face, mouth: (["open", "smile", "small"] as const)[i % 3], hy: i % 6 === 0 ? 1 : 0 })) }],
+          // Zuhören und lächeln
+          [`listen${side}`, { fps: 6, frames: repeat(18, i => ({ ...face, mouth: "smile", eyes: i % 9 === 8 ? "happy" : "bead", hy: i % 9 < 2 ? 1 : 0 })) }],
+          // Herzchen
+          [`love${side}`, { fps: 5, frames: repeat(12, i => ({ ...face, hy: i % 4 < 2 ? 1 : 0, eyes: "happy", mouth: "smile", blush: true, arms: "hold", props: hearts[i % 4] })) }],
+          // Abklatschen: Pfote zur Seite hoch, kleiner Hüpfer
+          [
+            `five${side}`,
+            {
+              fps: 8,
+              frames: [
+                { ...face, body: "squash" },
+                ...times(2, [{ ...face, arms: arm("up1"), y: -1, mouth: "grin", eyes: "happy" }]),
+                ...times(3, [{ ...face, arms: arm("stretch"), body: "tall", y: -2, mouth: "grin", eyes: "happy", props: [side === "L" ? "stars2" : "stars1"] }]),
+                { body: "squash", ...happy },
+                ...times(3, [{ ...face, ...happy }]),
+              ],
+            },
+          ],
+          // Winken zum anderen hin
+          [
+            `bye${side}`,
+            { fps: 6, frames: [...times(3, [{ ...face, arms: arm("stretch"), ...happy }, { ...face, arms: arm("stretch"), hy: 1, ...happy }]), { ...face, ...happy }] },
+          ],
+        ];
+        return clips;
+      })
+    ),
     alarm: {
       fps: 8,
       frames: [

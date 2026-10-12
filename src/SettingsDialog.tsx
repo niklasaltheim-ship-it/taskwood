@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { disable as autostartOff, enable as autostartOn, isEnabled as autostartIsOn } from "@tauri-apps/plugin-autostart";
 import { APP_NAME, CONTACT, PUBLISHER } from "./about";
 import { systemLang, t } from "./i18n";
 import type { LangSetting } from "./i18n";
+import { QUICK_LABEL } from "./settings";
+import type { Settings } from "./settings";
 import LICENSE_TEXT from "../LICENSE?raw";
 
 type Props = {
-  language: LangSetting;
-  calm: boolean;
-  bubbles: boolean;
-  onChange: (patch: { language?: LangSetting; calm?: boolean; bubbles?: boolean }) => void;
+  settings: Settings;
+  shortcutFailed: boolean;
+  onImportIcs: () => void;
+  icsMessage: string | null;
+  onChange: (patch: Partial<Settings>) => void;
   onExport: () => void;
   onImport: () => void;
   confirmImport: boolean;
@@ -36,7 +40,29 @@ export default function SettingsDialog(p: Props) {
     invoke<string>("third_party_licenses").then(setThirdParty).catch(() => setThirdParty("—"));
   }, [page]);
 
+  // Autostart liegt bei Windows (Registry), nicht in den gespeicherten Einstellungen
+  const [autostart, setAutostart] = useState<boolean | null>(null);
+  useEffect(() => {
+    autostartIsOn().then(setAutostart).catch(() => setAutostart(null));
+  }, []);
+  const toggleAutostart = async (on: boolean) => {
+    try {
+      await (on ? autostartOn() : autostartOff());
+      setAutostart(await autostartIsOn());
+    } catch {}
+  };
+
   const auto = systemLang() === "de" ? "Deutsch" : "English";
+  const s = p.settings;
+  const toggle = (key: keyof Settings, label: string, hint?: string) => (
+    <label className="check-row">
+      <input type="checkbox" checked={!!s[key]} onChange={e => p.onChange({ [key]: e.target.checked })} />
+      <span>
+        {label}
+        {hint && <small className="check-hint">{hint}</small>}
+      </span>
+    </label>
+  );
 
   return (
     <div className="overlay" onMouseDown={e => e.target === e.currentTarget && p.onClose()}>
@@ -46,20 +72,43 @@ export default function SettingsDialog(p: Props) {
             <h2>{t("Einstellungen")}</h2>
             <label className="field">
               {t("Sprache")}
-              <select value={p.language} onChange={e => p.onChange({ language: e.target.value as LangSetting })}>
+              <select value={s.language} onChange={e => p.onChange({ language: e.target.value as LangSetting })}>
                 <option value="auto">{t("Automatisch ({lang})", { lang: auto })}</option>
                 <option value="de">Deutsch</option>
                 <option value="en">English</option>
               </select>
             </label>
-            <label className="check-row">
-              <input type="checkbox" checked={p.calm} onChange={e => p.onChange({ calm: e.target.checked })} />
-              {t("Ruhemodus: Tiere bewegen sich nicht")}
-            </label>
-            <label className="check-row">
-              <input type="checkbox" checked={p.bubbles} onChange={e => p.onChange({ bubbles: e.target.checked })} />
-              {t("Sprechblasen vom Tier")}
-            </label>
+            <fieldset className="set-group">
+              <legend>{t("Alltag")}</legend>
+              {autostart !== null && (
+                <label className="check-row">
+                  <input type="checkbox" checked={autostart} onChange={e => toggleAutostart(e.target.checked)} />
+                  <span>{t("Mit Windows starten")}</span>
+                </label>
+              )}
+              {toggle("quickAdd", t("Schnelleingabe mit {key}", { key: t(QUICK_LABEL) }), t("Aus jedem Programm: Aufgabe tippen, Enter, fertig."))}
+              {s.quickAdd && p.shortcutFailed && <p className="field-error">{t("Das Tastenkürzel ist schon von einem anderen Programm belegt.")}</p>}
+              {toggle("today", t("Heute-Ansicht"), t("Alles Fällige aus allen Projekten auf einen Blick."))}
+              {toggle("search", t("Suche über alle Projekte"))}
+              {toggle("timer", t("Timer"))}
+              {toggle("icsImport", t("Kalender-Import (.ics)"), t("Stundenpläne und Termine aus anderen Kalendern übernehmen."))}
+              {s.icsImport && (
+                <div className="settings-row">
+                  <button className="btn" onClick={p.onImportIcs}>{t(".ics-Datei importieren…")}</button>
+                </div>
+              )}
+              {s.icsImport && p.icsMessage && <p className="settings-note">{p.icsMessage}</p>}
+            </fieldset>
+            <fieldset className="set-group">
+              <legend>{t("Tiere")}</legend>
+              {toggle("bubbles", t("Sprechblasen vom Tier"))}
+              {toggle("calm", t("Ruhemodus: Tiere bewegen sich nicht"))}
+              {toggle("seasons", t("Jahreszeiten"), t("Schal und Schnee im Winter, Blumen im Frühling, Schmetterling im Sommer, Blätter im Herbst."))}
+              {toggle("accessories", t("Accessoires"), t("Werden durch erledigte Aufgaben freigeschaltet. Auswahl im Projekt-Dialog."))}
+              {toggle("visits", t("Besuche"), t("Tiere anderer Projekte schauen ab und zu vorbei."))}
+              {toggle("game", t("Spiel „Dammbau“"), t("Im Ordner-Menü unter „Pause machen“."))}
+              {s.game && toggle("gameSound", t("Töne im Spiel"))}
+            </fieldset>
             <div className="field">
               {t("Datensicherung")}
               <div className="settings-row">
@@ -81,7 +130,7 @@ export default function SettingsDialog(p: Props) {
         {page === "about" && (
           <>
             <h2>{APP_NAME}</h2>
-            <p className="about-line">{t("Version {v}", { v: version || "1.0.0" })} · © 2026 {PUBLISHER}</p>
+            <p className="about-line">{t("Version {v}", { v: version || "1.2.0" })} · © 2026 {PUBLISHER}</p>
             <p className="about-line">{t("Lizenz: MIT")}</p>
             <div className="settings-row">
               <button className="btn" onClick={() => setPage("license")}>{t("Lizenztext")}</button>

@@ -1,0 +1,245 @@
+/* ---------- Spiel "Dammbau" ---------- */
+
+.dam {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  background: #1f2a28;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dam-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  background: var(--head);
+  color: var(--head-text);
+  cursor: grab;
+}
+.dam-score {
+  min-width: 34px;
+  padding: 0 7px;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: #f4f0e4;
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.dam-combo {
+  font-weight: 800;
+  color: #f2d27a;
+}
+.dam-best {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.dam-btn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--head-text);
+}
+.dam-btn:hover {
+  background: color-mix(in srgb, var(--head-text) 18%, transparent);
+}
+.dam-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dam-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+}
+.dam-world {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.dam-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.dam-pet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+.dam-bubble {
+  top: 4px;
+}
+.dam-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.dam-float {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -100%);
+  padding: 2px 8px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: #fbfaf3;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: dam-float 1s ease-out forwards;
+}
+.dam-float.big {
+  background: #f2d27a;
+  font-size: 15px;
+}
+@keyframes dam-float {
+  0% { opacity: 0; translate: 0 6px; }
+  15%, 70% { opacity: 1; translate: 0 0; }
+  100% { opacity: 0; translate: 0 -14px; }
+}
+
+.dam-panel {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(340px, calc(100% - 32px));
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 2px solid var(--ink);
+  border-top: 6px solid var(--head);
+  border-radius: 12px;
+  background: #fbfaf3;
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  cursor: default;
+  text-align: center;
+}
+.dam-panel h2 {
+  margin: 0;
+  font-size: 19px;
+  color: var(--strong);
+}
+.dam-panel p {
+  margin: 0;
+  font-size: 13px;
+}
+.dam-hint {
+  color: var(--muted);
+  font-size: 12px !important;
+}
+.dam-panel .btn {
+  align-self: center;
+}
+.dam-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.dam-result b {
+  font-size: 22px;
+  color: var(--strong);
+}
+.dam-record {
+  align-self: center;
+  padding: 3px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: #f2d27a;
+  color: var(--ink);
+  font-weight: 800;
+  animation: dam-pop 0.6s ease-out;
+}
+@keyframes dam-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+}
+.dam-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+.dam-tabs button {
+  padding: 3px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+}
+.dam-tabs button.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.dam-top {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rank;
+  text-align: left;
+}
+.dam-top li {
+  counter-increment: rank;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.dam-top li::before {
+  content: counter(rank) ".";
+  width: 16px;
+  color: var(--muted);
+}
+.dam-top b {
+  min-width: 30px;
+  color: var(--strong);
+  font-variant-numeric: tabular-nums;
+}
+.dam-who,
+.dam-date {
+  color: var(--muted);
+}
+.dam-date {
+  margin-left: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dam-float,
+  .dam-record {
+    animation: none;
+  }
+}

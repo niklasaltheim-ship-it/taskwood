@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { availableMonitors, currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 
 const win = getCurrentWindow();
@@ -85,5 +86,30 @@ export async function ensureOnScreen() {
     const ny = Math.min(Math.max(y0, m.position.y + margin), m.position.y + m.size.height - size.height - TASKBAR * m.scaleFactor);
     home = null;
     await win.setPosition(new PhysicalPosition(Math.round(nx), Math.round(ny)));
+  } catch {}
+}
+
+// Besuch im eingeklappten Zustand: Fenster um dx verbreitern, nach links (falls Platz) sonst nach rechts.
+// Gibt die Seite zurück, auf der der Gast sitzt, oder null.
+export async function widenForVisit(dx: number): Promise<"left" | "right" | null> {
+  try {
+    const [mon, pos, size, sf] = await Promise.all([currentMonitor(), win.outerPosition(), win.outerSize(), win.scaleFactor()]);
+    const x = pos.x / sf;
+    const y = pos.y / sf;
+    const w = size.width / sf;
+    const h = size.height / sf;
+    const left = !mon || x - dx >= mon.position.x / sf;
+    await invoke("set_bounds", { x: left ? x - dx : x, y, width: w + dx, height: h });
+    return left ? "left" : "right";
+  } catch {
+    return null;
+  }
+}
+
+export async function narrowAfterVisit(dx: number, side: "left" | "right") {
+  try {
+    const [pos, size, sf] = await Promise.all([win.outerPosition(), win.outerSize(), win.scaleFactor()]);
+    const x = pos.x / sf;
+    await invoke("set_bounds", { x: side === "left" ? x + dx : x, y: pos.y / sf, width: size.width / sf - dx, height: size.height / sf });
   } catch {}
 }

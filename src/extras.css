@@ -1285,3 +1285,454 @@ button.cal-item:hover {
   border-top: 1px solid var(--line);
   border-radius: 0 0 8px 8px;
 }
+
+/* ---------- Hauptmenü (Kopfzeile) ---------- */
+
+.menu-toggle {
+  position: relative;
+}
+.menu-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--head);
+  background: var(--danger);
+}
+.app-menu {
+  top: 40px;
+  left: auto;
+  right: 8px;
+  width: 230px;
+  max-height: calc(100% - 50px);
+  overflow-y: auto;
+  gap: 1px;
+}
+.app-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--text);
+}
+.app-item:hover {
+  background: rgba(101, 109, 74, 0.1);
+}
+.app-item.on {
+  background: color-mix(in srgb, var(--soft) 35%, transparent);
+}
+.app-item.on .m-name {
+  font-weight: 600;
+  color: var(--strong);
+}
+.app-item svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.app-item kbd {
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+}
+.m-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--line);
+}
+
+/* Laufender Timer als kleines Schild in der Kopfzeile */
+.bar-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px 0 5px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--head-text) 16%, transparent);
+  color: var(--head-text);
+}
+.bar-timer:hover,
+.bar-timer.on {
+  background: var(--accent);
+  color: #fff;
+}
+.bar-timer svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon.back {
+  margin-left: -4px;
+  margin-right: -4px;
+}
+
+/* ---------- Besuch ---------- */
+
+.visitor {
+  display: flex;
+  margin: 0 2px 0 -6px;
+  animation: visit-in 0.6s ease-out;
+}
+.visitor .pet-canvas {
+  margin: -10px -2px -4px;
+}
+.visitor.leaving {
+  animation: visit-out 0.5s ease-in forwards;
+}
+@keyframes visit-in {
+  from { opacity: 0; transform: translateX(24px); }
+}
+@keyframes visit-out {
+  to { opacity: 0; transform: translateX(24px); }
+}
+
+/* ---------- Heute und Suche ---------- */
+
+.today-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--strong);
+}
+.today-sec {
+  margin-top: 10px;
+}
+.today-sec h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--strong);
+}
+.today-sec h3.late-head {
+  color: var(--danger);
+}
+.today-sec .list {
+  margin-top: 0;
+}
+.today-sec .cal-item + .cal-item {
+  margin-top: 4px;
+}
+.today-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.today-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--strong);
+}
+.empty.small {
+  margin: 6px 4px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hit {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  text-align: left;
+}
+.hit:hover {
+  background: rgba(101, 109, 74, 0.1);
+}
+.hit .pet-canvas {
+  flex-shrink: 0;
+}
+.hit-icon {
+  width: 20px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.hit-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hit-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hit-text {
+  word-break: break-word;
+}
+.hit.done .hit-text {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+.hit-note {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hit-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--soft) 70%, #f3e2a6);
+  color: inherit;
+}
+
+/* Sprung aus Suche oder Heute: Aufgabe kurz hervorheben */
+.task.flash > .row,
+.sub.flash > .row {
+  animation: flash 1.6s ease-out;
+  border-radius: 6px;
+}
+@keyframes flash {
+  0%, 40% { background: color-mix(in srgb, var(--soft) 60%, transparent); }
+  100% { background: transparent; }
+}
+
+.cal-note {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* ---------- Accessoires im Projekt-Dialog ---------- */
+
+.wear-pick {
+  grid-template-columns: repeat(5, 1fr);
+}
+.pick-one.locked {
+  opacity: 0.45;
+  cursor: default;
+}
+.pick-one.locked:hover {
+  background: none;
+}
+.wear-note {
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+/* ---------- Einstellungen: Gruppen ---------- */
+
+.set-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.set-group legend {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.set-group .check-row {
+  align-items: flex-start;
+}
+.set-group .check-row input {
+  margin-top: 3px;
+}
+.check-hint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* ---------- Schnelleingabe-Fenster ---------- */
+
+.quick {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+}
+.quick-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 8px;
+  border: 1px solid var(--ink);
+  border-top: 5px solid var(--head);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--soft) 12%, #fdfcf8);
+  box-shadow: 0 4px 10px rgba(51, 61, 41, 0.25);
+  cursor: grab;
+}
+.quick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.quick-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--accent);
+  background: #fff;
+  font-size: 15px;
+  cursor: text;
+}
+.quick-input::placeholder {
+  color: var(--muted);
+}
+.quick-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.quick-project {
+  max-width: 170px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+  color: var(--strong);
+}
+.quick-help {
+  white-space: nowrap;
+}
+
+/* Besuch am eingeklappten Tier: Fenster ist breiter, das eigene Tier bleibt an seiner Stelle */
+.mini.visiting {
+  justify-content: flex-end;
+  padding-right: 6px;
+}
+.mini.visiting.right {
+  justify-content: flex-start;
+  padding-right: 0;
+  padding-left: 6px;
+}
+/* eigene Sprechblase über dem eigenen Tier, die des Gasts über dem Gast */
+.mini.visiting > .bubble {
+  left: auto;
+  right: 66px;
+  transform: translateX(50%);
+}
+.mini.visiting.right > .bubble {
+  left: 66px;
+  right: auto;
+  transform: translateX(-50%);
+}
+.mini-visitor {
+  position: relative;
+  display: flex;
+  margin-right: -10px;
+  cursor: pointer;
+  animation: guest-in-l 0.7s ease-out;
+}
+.mini.right .mini-visitor {
+  order: 2;
+  margin: 0 0 0 -10px;
+  animation-name: guest-in-r;
+}
+.mini-visitor.leaving {
+  animation: guest-out-l 0.5s ease-in forwards;
+}
+.mini.right .mini-visitor.leaving {
+  animation-name: guest-out-r;
+}
+@keyframes guest-in-l {
+  from { opacity: 0; transform: translateX(-40px); }
+}
+@keyframes guest-in-r {
+  from { opacity: 0; transform: translateX(40px); }
+}
+@keyframes guest-out-l {
+  to { opacity: 0; transform: translateX(-40px); }
+}
+@keyframes guest-out-r {
+  to { opacity: 0; transform: translateX(40px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mini-visitor,
+  .mini-visitor.leaving {
+    animation: none;
+  }
+}
+.mini-visitor .guest-bubble {
+  top: -18px;
+}
+.visitor {
+  position: relative;
+}
+.bubble.guest-bar {
+  top: 4px;
+  left: 44px;
+}
+
+/* Dialoge nie höher als das Fenster; die Knöpfe (Speichern, Abbrechen) bleiben unten sichtbar */
+.overlay > .dialog {
+  max-height: 100%;
+  overflow-y: auto;
+}
+.overlay > .dialog > .actions {
+  position: sticky;
+  bottom: -14px;
+  z-index: 1;
+  margin: 0 -14px -14px;
+  padding: 10px 14px 14px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+/* Ordner-Menü: Spiel starten */
+.m-break {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+}
+.m-break svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

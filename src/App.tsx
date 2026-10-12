@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ensureOnScreen, fitWindow, forgetHome, shrinkWindow } from "./windowSize";
+import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { Window, getCurrentWindow } from "@tauri-apps/api/window";
+import { listen, emitTo } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
+import { ensureOnScreen, fitWindow, forgetHome, narrowAfterVisit, shrinkWindow, widenForVisit } from "./windowSize";
+import { enable as enableAutostart } from "@tauri-apps/plugin-autostart";
 import Pet from "./pet/Pet";
 import { stashName } from "./pet/Pet";
 import type { PetEvent } from "./pet/Pet";
@@ -12,6 +17,11 @@ import { cliTask, exportWithDialog, importWithDialog, quitApp, readBackupFile, w
 import Calendar from "./Calendar";
 import { activeAppointments, countdown, dueReminders, upcomingExams } from "./events";
 import { currentOrNext, hm } from "./schedule";
+import { parseIcs } from "./ics";
+import TodayView, { dueToday } from "./TodayView";
+import SearchView from "./SearchView";
+import { ACCESSORIES, seasonOf, unlocked } from "./pet/wear";
+import type { Accessory, Wear } from "./pet/wear";
 import { ANIMALS, P, THEMES, animalName } from "./sprites";
 import type { AnimalKind } from "./sprites";
 import { createConfetti } from "./confetti";
@@ -21,14 +31,19 @@ import { daysUntil, formatDue, formatDueLong, iso, nextDue, parseTask, repeatLab
 import { PRESETS, chime, clock, ensureNotifyPermission, notify, remaining, tiny, unlockAudio } from "./timer";
 import { useDangle } from "./dangle";
 import { locale, setLang, t } from "./i18n";
-import type { LangSetting } from "./i18n";
+import { DEFAULT_SETTINGS, QUICK_KEY, SETTINGS, loadSettings } from "./settings";
+import type { Settings } from "./settings";
 import SettingsDialog from "./SettingsDialog";
+import DamGame from "./game/DamGame";
+import type { DemoMode } from "./game/DamGame";
+import { addScore } from "./game/scores";
 import "./App.css";
 import "./extras.css";
 
 type Dialog = { mode: "new" } | { mode: "edit"; id: string };
 type HistRow = { task: Task; subs: Task[]; parent?: string };
-type Menu = null | "folders" | "projects";
+type Menu = null | "folders" | "projects" | "main";
+type View = "list" | "history" | "plan" | "today" | "search";
 type Undo = { ids: string[]; text: string; spawned: string[] }; // spawned: Folgeaufgaben wiederkehrender Aufgaben
 
 const win = getCurrentWindow();
@@ -42,19 +57,18 @@ const BUBBLE_GAP = 3 * 60000; // von selbst: höchstens alle drei Minuten eine S
 const REACT_GAP = 15000; // als Antwort auf eigene Aktionen (abhaken, hinzufügen, Timer): alle 15 s
 const BUBBLE_MS = 2800;
 const REPLAY_MS = 8000; // so lange nach Feier/Sprechblase spielt das eingeklappte Tier sie noch einmal
-const SETTINGS = "taskwood-settings";
+const VISIT_FIRST = [30000, 60000]; // erster Besuch nach dem Start (ms, von–bis)
+const VISIT_GAP = [4 * 60000, 9 * 60000]; // danach
+const VISIT_STAY = 25000;
+const VISIT_W = 104; // so viel breiter wird das kleine Fenster für den Gast (Gast gleich groß, leicht überlappend)
+const GUEST_BUBBLE_MS = 2400;
+type Side = "L" | "R"; // Blickrichtung beim Besuch
+const between = ([a, b]: number[]) => a + Math.random() * (b - a);
 
-// calm: Ruhemodus, die Tiere zeigen nur ein ruhiges Standbild ihrer Stimmung
-// large: großes Aufgabenfenster; language: Standard Englisch, "auto" = Systemsprache
-type Settings = { bubbles: boolean; calm: boolean; large: boolean; language: LangSetting };
-const DEFAULT_SETTINGS: Settings = { bubbles: true, calm: false, large: false, language: "en" };
-function loadSettings(): Settings {
-  try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS) || "{}") };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
-}
+// Tastenkürzel nacheinander an- und abmelden, sonst überholen sich die Aufrufe (z. B. im StrictMode)
+let shortcutChain: Promise<unknown> = Promise.resolve();
+const queueShortcut = (f: () => Promise<unknown>) => (shortcutChain = shortcutChain.then(f, f));
+
 const STASH_DAYS = 7;
 const EXAM_DAYS = 21; // Countdown-Banner ab drei Wochen vorher
 const isoToday = () => iso(new Date());
@@ -100,12 +114,22 @@ const Icon = ({ d, circle }: { d: string; circle?: boolean }) => (
 
 const FOLDER_D = "M2 4.5h4l1.5 1.5H14v6.5H2z";
 const TIMER_D = "M5 2h6M5 14h6M5.5 2c0 3.5 5 4 5 6s-5 2.5-5 6M10.5 2c0 3.5-5 4-5 6s5 2.5 5 6";
+const LIST_D = "M6 4.5h7M6 8h7M6 11.5h7M3 4.5h.5M3 8h.5M3 11.5h.5";
+const TODAY_D = "M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M8 8.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z";
+const SEARCH_D = "M7 2.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9M10.3 10.3L13.5 13.5";
+const CAL_D = "M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h2M9 9h2M5 11h2";
+const TABLE_D = "M2.5 3h11v10.5h-11zM2.5 6h11M6.5 3v10.5M2.5 9.5h11";
+const HIST_D = "M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11M8 5v3l2 1.5";
+const GEAR_D = "M8 5.8a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M3.6 12.4l1.2-1.2M11.2 4.8l1.2-1.2";
+const MENU_D = "M3 4.5h10M3 8h10M3 11.5h10";
+const BIG_D = "M9.5 6.5l4-4M10 2.5h3.5V6M6.5 9.5l-4 4M6 13.5H2.5V10";
+const SMALL_D = "M13.5 2.5L9.5 6.5M9.5 3v3.5H13M2.5 13.5l4-4M6.5 13V9.5H3";
 
 export default function App() {
   const [data, setData] = useState<Data>(load);
   const [collapsed, setCollapsed] = useState(true);
   const [closing, setClosing] = useState(false);
-  const [view, setView] = useState<"list" | "history" | "plan">("list");
+  const [view, setView] = useState<View>("list");
   const [planTab, setPlanTab] = useState<"month" | "timetable">("month");
   const [calFocus, setCalFocus] = useState<string | null>(null);
   const [week, setWeek] = useState(false);
@@ -116,6 +140,7 @@ export default function App() {
   const [dlgName, setDlgName] = useState("");
   const [dlgAnimal, setDlgAnimal] = useState<AnimalKind>("beaver");
   const [dlgFolder, setDlgFolder] = useState("");
+  const [dlgWear, setDlgWear] = useState<Accessory | undefined>(undefined);
   const [confirmDel, setConfirmDel] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [subFor, setSubFor] = useState<string | null>(null);
@@ -140,6 +165,16 @@ export default function App() {
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
   const [confirmImport, setConfirmImport] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcutFailed, setShortcutFailed] = useState(false);
+  const [icsMsg, setIcsMsg] = useState<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const [visitor, setVisitor] = useState<{ id: string; at: number; leaving?: boolean } | null>(null);
+  const [guestEvent, setGuestEvent] = useState<PetEvent | null>(null);
+  const [guestBubble, setGuestBubble] = useState<{ text: string; at: number } | null>(null);
+  const [visitSide, setVisitSide] = useState<"left" | "right" | null>(null);
+  const [game, setGame] = useState<{ demo: DemoMode | null; key: number } | null>(null); // eingeklappt: Fenster für den Gast verbreitert
+  const visitSideRef = useRef<"left" | "right" | null>(null);
+  const winChain = useRef<Promise<unknown>>(Promise.resolve());
   const lastBubble = useRef(0);
   // Zuletzt gezeigte Sprechblase und Tier-Ereignis, damit das kleine Tier sie nach dem Einklappen wiederholt
   const lastShown = useRef<{ text: string; at: number } | null>(null);
@@ -252,6 +287,13 @@ export default function App() {
   const stashText = (p: Project) => {
     const s = stashName(p.animal, stashOf(p));
     return s && stashOf(p) > 0 ? "\n" + t("Vorrat diese Woche: {s}", { s }) : "";
+  };
+
+  // Accessoire (falls freigeschaltet und eingeschaltet) und Jahreszeit für das Tier eines Projekts
+  const season = settings.seasons ? seasonOf(new Date(now)) : undefined;
+  const wearFor = (p?: Project | null): Wear | undefined => {
+    const accessory = settings.accessories && p?.wear && unlocked(p.wear, data.doneTotal) ? p.wear : undefined;
+    return accessory || season ? { accessory, season } : undefined;
   };
 
   // Termin, der gerade beginnt bzw. läuft und noch nicht mit OK bestätigt wurde
@@ -399,9 +441,25 @@ export default function App() {
 
   // ---------- Fenster ----------
 
+  // Besuch im eingeklappten Zustand: Fenster verbreitern bzw. zurücksetzen, nacheinander ausgeführt
+  const setWide = (want: boolean) =>
+    (winChain.current = winChain.current.then(async () => {
+      if (want && !visitSideRef.current) {
+        const side = await widenForVisit(VISIT_W);
+        visitSideRef.current = side;
+        setVisitSide(side);
+      } else if (!want && visitSideRef.current) {
+        const side = visitSideRef.current;
+        visitSideRef.current = null;
+        await narrowAfterVisit(VISIT_W, side);
+        setVisitSide(null);
+      }
+    }));
+
   const collapse = async () => {
     setMenu(null);
     setDialog(null);
+    setVisitor(null);
     if (!reducedMotion()) {
       setClosing(true);
       await sleep(CLOSE_MS);
@@ -424,6 +482,7 @@ export default function App() {
       if (p) selectProject(p);
       setAlarm(null);
     }
+    await setWide(false);
     const size = cardSize(settings.large, view === "plan" && planTab === "timetable" && week);
     await fitWindow(size.w, size.h);
     setCollapsed(false);
@@ -520,7 +579,11 @@ export default function App() {
     // Hauptaufgabe erledigt: offene Unteraufgaben gelten ebenfalls als erledigt
     const ids = [task.id, ...data.tasks.filter(t => t.parentId === task.id && !t.doneAt).map(t => t.id)];
     // Tier freut sich mit; letzte offene Aufgabe = große Feier, danach schläft es zufrieden ein
-    const left = task.parentId ? open.length : open.length - 1;
+    const siblings = openIn(task.projectId).length;
+    const left = task.parentId ? siblings : siblings - 1;
+    // Neues Accessoire freigeschaltet?
+    const before = data.doneTotal;
+    const prize = ACCESSORIES.find(a => before < a.need && before + ids.length >= a.need);
     petDo(left === 0 ? "allDone" : "done");
     if (left === 0) say(t(pick(["Geschafft!", "Alles erledigt!", "Feierabend!"])), true);
     else if (left === 1) say(t("Nur noch eine!"), REACT_GAP);
@@ -538,7 +601,12 @@ export default function App() {
     }
     window.setTimeout(() => {
       const at = Date.now();
-      setData(d => ({ ...d, tasks: [...d.tasks.map(t => (ids.includes(t.id) ? { ...t, doneAt: at } : t)), ...spawned] }));
+      setData(d => ({
+        ...d,
+        tasks: [...d.tasks.map(t => (ids.includes(t.id) ? { ...t, doneAt: at } : t)), ...spawned],
+        doneTotal: d.doneTotal + ids.length,
+      }));
+      if (prize && settings.accessories) say(t("Neu freigeschaltet: {item}!", { item: t(prize.name) }), true);
       setLeaving(l => l.filter(x => x !== task.id));
       if (subFor === task.id) setSubFor(null);
       if (detailsId === task.id) setDetailsId(null);
@@ -553,6 +621,7 @@ export default function App() {
     setData(d => ({
       ...d,
       tasks: d.tasks.filter(t => !undo.spawned.includes(t.id)).map(t => (undo.ids.includes(t.id) ? { ...t, doneAt: undefined } : t)),
+      doneTotal: Math.max(0, d.doneTotal - undo.ids.length),
     }));
     window.clearTimeout(undoTimer.current);
     setUndo(null);
@@ -697,6 +766,7 @@ export default function App() {
     setDialog({ mode: "new" });
     setDlgName("");
     setDlgAnimal("beaver");
+    setDlgWear(undefined);
     setConfirmDel(false);
     setMenu(null);
   };
@@ -706,6 +776,7 @@ export default function App() {
     setDlgName(p.name);
     setDlgAnimal(p.animal);
     setDlgFolder(p.folderId);
+    setDlgWear(p.wear);
     setConfirmDel(false);
     setMenu(null);
   };
@@ -714,7 +785,7 @@ export default function App() {
     if (!dialog) return;
     const name = dlgName.trim();
     if (dialog.mode === "new") {
-      const p: Project = { id: uid(), folderId: folder.id, name: name || t("Neues Projekt"), animal: dlgAnimal };
+      const p: Project = { id: uid(), folderId: folder.id, name: name || t("Neues Projekt"), animal: dlgAnimal, wear: dlgWear };
       setData(d => ({
         ...d,
         projects: [...d.projects, p],
@@ -725,7 +796,7 @@ export default function App() {
       const id = dialog.id;
       setData(d => {
         const projects = d.projects.map(p =>
-          p.id === id ? { ...p, name: name || p.name, animal: dlgAnimal, folderId: dlgFolder || p.folderId } : p
+          p.id === id ? { ...p, name: name || p.name, animal: dlgAnimal, folderId: dlgFolder || p.folderId, wear: dlgWear } : p
         );
         // Projekt in anderen Ordner verschoben: dorthin mitgehen
         const moved = projects.find(p => p.id === id)!;
@@ -756,7 +827,7 @@ export default function App() {
   useEffect(() => {
     if (!menu) return;
     const close = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest(".menu, .path")) setMenu(null);
+      if (!(e.target as HTMLElement).closest(".menu, .path, .menu-toggle")) setMenu(null);
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
     window.addEventListener("mousedown", close);
@@ -827,10 +898,258 @@ export default function App() {
         if (collapsed) expand();
         setLab(l => !l);
       }
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "f" && settings.search && !collapsed) {
+        e.preventDefault();
+        setMenu(null);
+        setView("search");
+      }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   });
+
+  // ---------- Schnelleingabe (eigenes Fenster, Strg+Alt+T) ----------
+
+  const sayRef = useRef(say);
+  sayRef.current = say;
+  const petDoRef = useRef(petDo);
+  petDoRef.current = petDo;
+
+  useEffect(() => {
+    const off = listen<{ projectId: string; text: string }>("quick-add", ({ payload }) => {
+      const p = dataRef.current.projects.find(x => x.id === payload.projectId);
+      if (!p || !payload.text.trim()) return;
+      const { text, due, prio, repeat } = parseTask(payload.text);
+      setData(d => ({
+        ...d,
+        tasks: [...d.tasks, { id: uid(), projectId: p.id, text, createdAt: Date.now(), order: d.tasks.reduce((m, t) => Math.max(m, t.order), 0) + 1, due, prio, repeat }],
+      }));
+      petDoRef.current("added");
+      sayRef.current(t("Notiert!"), true);
+    });
+    return () => {
+      off.then(f => f());
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!settings.quickAdd) return;
+    const openQuick = async () => {
+      const q = await Window.getByLabel("quick");
+      if (!q) return;
+      await emitTo("quick", "quick-open");
+      await q.center();
+      await q.show();
+      await q.setFocus();
+    };
+    queueShortcut(async () => {
+      try {
+        if (await isRegistered(QUICK_KEY)) await unregister(QUICK_KEY);
+        await register(QUICK_KEY, e => {
+          if (e.state === "Pressed") openQuick();
+        });
+        setShortcutFailed(false);
+      } catch {
+        // z. B. von einem anderen Programm belegt
+        setShortcutFailed(true);
+      }
+    });
+    return () => {
+      queueShortcut(() => unregister(QUICK_KEY).catch(() => {}));
+    };
+  }, [settings.quickAdd]);
+
+  // ---------- Kalender-Import (.ics) ----------
+
+  const importIcs = async () => {
+    setIcsMsg(null);
+    try {
+      const path = await openDialog({ multiple: false, directory: false, filters: [{ name: "iCalendar", extensions: ["ics"] }] });
+      if (!path || Array.isArray(path)) return;
+      const found = new Map(parseIcs(await invoke<string>("read_ics", { path })).map(e => [e.source!, e]));
+      if (!found.size) {
+        setIcsMsg(t("Keine aktuellen Termine in der Datei gefunden."));
+        return;
+      }
+      // Schon einmal importiert: aktualisieren statt verdoppeln
+      const cur = dataRef.current.events;
+      let updated = 0;
+      const events = cur.map(e => {
+        const n = e.source ? found.get(e.source) : undefined;
+        if (!n) return e;
+        found.delete(e.source!);
+        updated++;
+        return { ...e, title: n.title, place: n.place, date: n.date, start: n.start, end: n.end };
+      });
+      const added = [...found.values()].map(e => ({ ...e, id: uid() }));
+      setData(d => ({ ...d, events: [...events, ...added] }));
+      setIcsMsg(t("{n} Termine übernommen.", { n: added.length }) + (updated ? " " + t("{n} aktualisiert.", { n: updated }) : ""));
+    } catch {
+      setIcsMsg(t("Diese Datei konnte nicht gelesen werden."));
+    }
+  };
+
+  // ---------- Besuch von Tieren anderer Projekte ----------
+
+  const canVisit = settings.visits && data.projects.length > 1 && !game;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
+
+  useEffect(() => {
+    if (!canVisit) {
+      setVisitor(null);
+      return;
+    }
+    const timers: number[] = [];
+    const later = (ms: number, f: () => void) => void timers.push(window.setTimeout(f, ms));
+    // Wer schaut wohin: eingeklappt sitzt der Gast meist links, im offenen Fenster rechts neben dem Tier
+    const dirs = (): { host: Side; guest: Side } => {
+      const guestLeft = collapsedRef.current && visitSideRef.current !== "right";
+      return guestLeft ? { host: "L", guest: "R" } : { host: "R", guest: "L" };
+    };
+    const host = (type: string) => petDoRef.current(type);
+    const guest = (type: string) => setGuestEvent({ type, at: Date.now() });
+    const hostSay = (text: string) => sayRef.current(text, true);
+    const guestSay = (text: string) => {
+      if (!settingsRef.current.bubbles) return;
+      const at = Date.now();
+      setGuestBubble({ text, at });
+      window.setTimeout(() => setGuestBubble(b => (b?.at === at ? null : b)), GUEST_BUBBLE_MS);
+    };
+
+    // Gemeinsame Aktionen; pro Besuch zwei zufällige
+    const acts: Record<string, () => void> = {
+      chat: () => {
+        const d = dirs();
+        guest(`talk${d.guest}`);
+        host(`listen${d.host}`);
+        guestSay(t(pick(["Wie läuft's?", "Viel zu tun?", "Was machst du so?", "Na, fleißig?"])));
+        later(2700, () => {
+          const d2 = dirs();
+          host(`talk${d2.host}`);
+          guest(`listen${d2.guest}`);
+          const da = dataRef.current;
+          const n = da.tasks.filter(x => x.projectId === da.activeProject && !x.parentId && !x.doneAt).length;
+          hostSay(n ? t(n === 1 ? "Noch eine Aufgabe!" : "Noch {n} Aufgaben!", { n }) : t("Alles erledigt!"));
+        });
+        later(5400, () => {
+          guest("added");
+          guestSay(t(pick(["Du schaffst das!", "Weiter so!", "Klingt gut!", "Stark!"])));
+        });
+      },
+      hearts: () => {
+        const d = dirs();
+        guest(`love${d.guest}`);
+        host(`love${d.host}`);
+      },
+      hop: () => {
+        guestSay(t("Wer hüpft höher?"));
+        later(600, () => guest("done"));
+        later(1900, () => host("done"));
+        later(3600, () => guest("done"));
+        later(4900, () => host("done"));
+      },
+      five: () => {
+        guestSay(t("Gib mir fünf!"));
+        later(900, () => {
+          const d = dirs();
+          guest(`five${d.guest}`);
+          host(`five${d.host}`);
+        });
+      },
+    };
+
+    const arrive = () => {
+      const d0 = dataRef.current;
+      const list = d0.projects.filter(p => p.id !== d0.activeProject);
+      if (!list.length) return;
+      const v = pick(list);
+      setVisitor({ id: v.id, at: Date.now() });
+      setGuestEvent({ type: "wave", at: Date.now() });
+      hostSay(t("Besuch von {name}!", { name: v.name }));
+      later(1600, () => {
+        host(`bye${dirs().host}`);
+        guestSay(t(pick(["Hallo!", "Hi!", "Huhu!"])));
+      });
+      const [a, b] = Object.keys(acts).sort(() => Math.random() - 0.5);
+      later(4500, acts[a]);
+      later(11500, acts[b]);
+      later(VISIT_STAY - 4500, () => {
+        const d = dirs();
+        guest(`bye${d.guest}`);
+        host(`bye${d.host}`);
+        guestSay(t(pick(["Tschüss!", "Bis bald!", "Mach's gut!"])));
+      });
+      later(VISIT_STAY, () => {
+        setVisitor(x => x && { ...x, leaving: true });
+        later(500, () => {
+          setVisitor(null);
+          setGuestBubble(null);
+          later(between(VISIT_GAP), arrive);
+        });
+      });
+    };
+    later(between(VISIT_FIRST), arrive);
+    return () => timers.forEach(x => window.clearTimeout(x));
+  }, [canVisit]);
+
+  useEffect(() => {
+    setWide(collapsed && !!visitor);
+  }, [collapsed, !!visitor]);
+
+  // Erster Start dieser Version: Autostart einschalten (abschaltbar in den Einstellungen)
+  useEffect(() => {
+    if (settings.autostartInit || !import.meta.env.PROD) return;
+    enableAutostart()
+      .catch(e => console.error("Autostart fehlgeschlagen", e))
+      .finally(() => setSettings(st => ({ ...st, autostartInit: true })));
+  }, []);
+
+  // ---------- Ansichten, Suche, Sprung zur Aufgabe ----------
+
+  // Abgeschaltete Funktion: zurück zur Liste
+  useEffect(() => {
+    if ((view === "today" && !settings.today) || (view === "search" && !settings.search)) setView("list");
+    if (!settings.timer) setTimerOpen(false);
+  }, [settings.today, settings.search, settings.timer]);
+
+  const goToTask = (task: Task) => {
+    const p = data.projects.find(pp => pp.id === task.projectId);
+    if (p) selectProject(p);
+    setView(task.doneAt ? "history" : "list");
+    if (!task.doneAt) setFlashId(task.id);
+  };
+
+  // Gefundene Aufgabe kurz hervorheben
+  useEffect(() => {
+    if (!flashId) return;
+    document.querySelector(`[data-id="${flashId}"]`)?.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+    const tm = window.setTimeout(() => setFlashId(null), 1800);
+    return () => window.clearTimeout(tm);
+  }, [flashId]);
+
+  // ---------- Spiel "Dammbau" ----------
+
+  // Läuft im großen Fenster; danach zurück zur gewohnten Größe
+  const openGame = async (demo: DemoMode | null = null) => {
+    setMenu(null);
+    setLab(false);
+    setGame({ demo, key: Date.now() });
+    const size = cardSize(true, false);
+    await fitWindow(size.w, size.h);
+  };
+  const closeGame = async () => {
+    setGame(null);
+    const size = cardSize(settings.large, view === "plan" && planTab === "timetable" && week);
+    await fitWindow(size.w, size.h);
+  };
+  const saveScore = (score: number, layers: number) => {
+    const res = addScore(dataRef.current.dam, { score, layers, at: isoToday(), animal: theme });
+    setData(d => ({ ...d, dam: addScore(d.dam, { score, layers, at: isoToday(), animal: theme }).scores }));
+    return { record: res.record, animalRecord: res.animalRecord };
+  };
 
   // ---------- Ansicht: eingeklappt ----------
 
@@ -852,16 +1171,41 @@ export default function App() {
     const exam = upcomingExams(data.events, EXAM_DAYS)[0];
     const lecText = lec ? `
 ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.room}, ${hm(lec.lecture.start)}–${hm(lec.lecture.end)}` : "";
+    const guest = visitor && visitSide ? data.projects.find(p => p.id === visitor.id) : undefined;
+    const guestMood = moodOf(guest ?? null);
     return (
       <div
-        className="mini"
+        className={guest ? `mini visiting ${visitSide}` : "mini"}
         style={themeVars(shown?.animal ?? "beaver")}
         onMouseDown={onPetDown}
         title={label + lecText + (exam ? "\n" + t("Prüfung {title}: {cd}", { title: exam.title, cd: countdown(exam.date) }) : "")}
       >
         {bubble && <span className="bubble" key={bubble.at}>{bubble.text}</span>}
+        {guest && visitor && (
+          <div
+            className={visitor.leaving ? "mini-visitor leaving" : "mini-visitor"}
+            title={t("{name} ist zu Besuch. Klicken, um hinzuwechseln.", { name: guest.name })}
+            onMouseDown={e => {
+              if (e.button !== 0) return;
+              e.stopPropagation();
+              selectProject(guest);
+              setVisitor(null);
+              expand();
+            }}
+          >
+            {guestBubble && <span className="bubble guest-bubble" key={guestBubble.at}>{guestBubble.text}</span>}
+            <Pet
+              kind={guest.animal}
+              mood={["sleep", "alarm", "event"].includes(guestMood) ? "relaxed" : guestMood}
+              scale={3}
+              event={guestEvent}
+              reduced={settings.calm}
+              wear={wearFor(guest)}
+            />
+          </div>
+        )}
         <div className="pet" ref={n => void (dangle.current = n)}>
-          <Pet kind={shown?.animal ?? "beaver"} mood={mood} stash={stashOf(shown)} scale={3} event={petEvent} held={held} reduced={settings.calm} interactive />
+          <Pet kind={shown?.animal ?? "beaver"} mood={mood} stash={stashOf(shown)} scale={3} event={petEvent} held={held} reduced={settings.calm} wear={wearFor(shown)} interactive />
           {shownCount > 0 && <span className="badge big">{shownCount > 99 ? "99+" : shownCount}</span>}
           {tm && (
             <span className={tm.endsAt ? "ring" : "ring paused"}>
@@ -1006,6 +1350,28 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
   const cardClass = ["card", closing && "closing", dragId && "sorting"].filter(Boolean).join(" ");
   const alarmProject = alarm ? data.projects.find(p => p.id === alarm) : undefined;
   const hint = parsed && (parsed.due || parsed.prio) ? parsed : null;
+  const todayCount = settings.today ? dueToday(data.tasks).length : 0;
+  const showPath = view === "list" || view === "history";
+  const viewTitle = t(
+    { list: "Aufgaben", history: "Verlauf", today: "Heute", search: "Suche", plan: planTab === "month" ? "Kalender" : "Stundenplan" }[view]
+  );
+  const visitorProject = visitor ? data.projects.find(p => p.id === visitor.id) : undefined;
+  const visitMoodRaw = moodOf(visitorProject ?? null);
+  const visitMood: MoodState = ["sleep", "alarm", "event"].includes(visitMoodRaw) ? "relaxed" : visitMoodRaw;
+  const menuItem = (d: string, label: string, on: boolean, act: () => void, extra?: ReactNode) => (
+    <button
+      role="menuitem"
+      className={on ? "app-item on" : "app-item"}
+      onClick={() => {
+        setMenu(null);
+        act();
+      }}
+    >
+      <Icon d={d} />
+      <span className="m-name">{label}</span>
+      {extra}
+    </button>
+  );
 
   return (
     <div className={cardClass} style={themeVars(theme)}>
@@ -1014,44 +1380,50 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           className={hop ? "bar-pet hop" : "bar-pet"}
           ref={n => void (dangle.current = n)}
         >
-          <Pet kind={theme} mood={moodOf(project)} scale={1} event={petEvent} held={held} reduced={settings.calm} interactive />
+          <Pet kind={theme} mood={moodOf(project)} scale={1} event={petEvent} held={held} reduced={settings.calm} wear={wearFor(project)} interactive />
           {count > 0 && <span className="badge">{count > 99 ? "99+" : count}</span>}
         </span>
-        <span className="bar-title">{t(view === "list" ? "Aufgaben" : view === "history" ? "Verlauf" : planTab === "month" ? "Kalender" : "Stundenplan")}</span>
-        {project && (
+        {visitorProject && visitor && (
           <button
-            className={timerOpen ? "icon on" + (timer ? " wide" : "") : "icon" + (timer ? " wide" : "")}
+            className={visitor.leaving ? "visitor leaving" : "visitor"}
+            onClick={() => {
+              selectProject(visitorProject);
+              setVisitor(null);
+              setView("list");
+            }}
+            title={t("{name} ist zu Besuch. Klicken, um hinzuwechseln.", { name: visitorProject.name })}
+            aria-label={t("{name} ist zu Besuch. Klicken, um hinzuwechseln.", { name: visitorProject.name })}
+          >
+            <Pet kind={visitorProject.animal} mood={visitMood} scale={1} event={guestEvent} reduced={settings.calm} wear={wearFor(visitorProject)} />
+            {guestBubble && <span className="bubble in-bar guest-bar" key={guestBubble.at}>{guestBubble.text}</span>}
+          </button>
+        )}
+        {view !== "list" && (
+          <button className="icon back" onClick={() => setView("list")} title={t("Zurück zu den Aufgaben")} aria-label={t("Zurück zu den Aufgaben")}>
+            <Icon d="M10 3.5L5.5 8l4.5 4.5" />
+          </button>
+        )}
+        <span className="bar-title">{viewTitle}</span>
+        {timer && settings.timer && (
+          <button
+            className={timerOpen ? "bar-timer on" : "bar-timer"}
             onClick={() => setTimerOpen(o => !o)}
             title={t("Timer")}
             aria-label={t("Timer")}
           >
             <Icon d={TIMER_D} />
-            {timer && <span className={timer.endsAt ? "bar-clock" : "bar-clock paused"}>{clock(left)}</span>}
+            <span className={timer.endsAt ? "bar-clock" : "bar-clock paused"}>{clock(left)}</span>
           </button>
         )}
         <button
-          className={view === "plan" ? "icon on" : "icon"}
-          onClick={() => setView(v => (v === "plan" ? "list" : "plan"))}
-          title={t(view === "plan" ? "Zurück zu den Aufgaben" : "Kalender und Stundenplan")}
-          aria-label={t("Kalender und Stundenplan")}
+          className={menu === "main" ? "icon menu-toggle on" : "icon menu-toggle"}
+          onClick={() => setMenu(m => (m === "main" ? null : "main"))}
+          title={t("Menü")}
+          aria-label={t("Menü")}
+          aria-expanded={menu === "main"}
         >
-          <Icon d="M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h2M9 9h2M5 11h2" />
-        </button>
-        <button
-          className={view === "history" ? "icon on" : "icon"}
-          onClick={() => setView(v => (v === "history" ? "list" : "history"))}
-          title={t(view === "history" ? "Zurück zu den Aufgaben" : "Verlauf anzeigen")}
-          aria-label={t("Verlauf")}
-        >
-          <Icon circle d="M8 4.5V8l2.5 1.5" />
-        </button>
-        <button
-          className="icon"
-          onClick={() => setSettings(st => ({ ...st, large: !st.large }))}
-          title={t(settings.large ? "Fenster verkleinern" : "Fenster vergrößern")}
-          aria-label={t(settings.large ? "Fenster verkleinern" : "Fenster vergrößern")}
-        >
-          <Icon d={settings.large ? "M13.5 2.5L9.5 6.5M9.5 3v3.5H13M2.5 13.5l4-4M6.5 13V9.5H3" : "M9.5 6.5l4-4M10 2.5h3.5V6M6.5 9.5l-4 4M6 13.5H2.5V10"} />
+          <Icon d={MENU_D} />
+          {settings.today && todayCount > 0 && <i className="menu-dot" />}
         </button>
         <button className="icon" onClick={collapse} title={t("Einklappen")} aria-label={t("Einklappen")}>
           <Icon d="M4 8h8" />
@@ -1061,6 +1433,28 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
         </button>
       </header>
 
+      {menu === "main" && (
+        <div className="menu app-menu" role="menu">
+          {menuItem(LIST_D, t("Aufgaben"), view === "list", () => setView("list"))}
+          {settings.today && menuItem(TODAY_D, t("Heute"), view === "today", () => setView("today"), todayCount > 0 ? <span className="count">{todayCount}</span> : null)}
+          {settings.search && menuItem(SEARCH_D, t("Suche"), view === "search", () => setView("search"), <kbd>{t("Strg+F")}</kbd>)}
+          {menuItem(CAL_D, t("Kalender"), view === "plan" && planTab === "month", () => {
+            setPlanTab("month");
+            setView("plan");
+          })}
+          {menuItem(TABLE_D, t("Stundenplan"), view === "plan" && planTab === "timetable", () => {
+            setPlanTab("timetable");
+            setView("plan");
+          })}
+          {project && menuItem(HIST_D, t("Verlauf"), view === "history", () => setView("history"))}
+          {settings.timer && project && menuItem(TIMER_D, t("Timer"), timerOpen, () => setTimerOpen(o => !o), timer ? <span className="m-sub">{clock(left)}</span> : null)}
+          <div className="m-sep" />
+          {menuItem(settings.large ? SMALL_D : BIG_D, t(settings.large ? "Fenster verkleinern" : "Fenster vergrößern"), false, () => setSettings(st => ({ ...st, large: !st.large })))}
+          {menuItem(GEAR_D, t("Einstellungen…"), false, () => setSettingsOpen(true))}
+        </div>
+      )}
+
+      {showPath && (
       <nav className="path">
         <button className={menu === "folders" ? "crumb on" : "crumb"} onClick={() => setMenu(m => (m === "folders" ? null : "folders"))} title={t("Ordner wechseln")}>
           <span className="crumb-name">{folder.name}</span>
@@ -1072,7 +1466,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           onDoubleClick={() => project && openEdit(project)}
           title={t("Projekt wechseln (Doppelklick zum Bearbeiten)")}
         >
-          {project && <Pet kind={project.animal} mood="relaxed" still crop="head" />}
+          {project && <Pet kind={project.animal} mood="relaxed" still crop="head" wear={wearFor(project)} />}
           <span className="crumb-name">{project ? project.name : t("Kein Projekt")}</span>
           <svg className="caret" viewBox="0 0 16 16"><path d="M5 6.5l3 3 3-3" /></svg>
         </button>
@@ -1089,9 +1483,9 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
               return (
                 <li key={p.id} className={p.id === project?.id ? "m-item on" : "m-item"} style={themeVars(p.animal)}>
                   <button className="m-main" onClick={() => selectProject(p)} onDoubleClick={() => openEdit(p)}>
-                    <Pet kind={p.animal} mood="relaxed" still crop="head" />
+                    <Pet kind={p.animal} mood="relaxed" still crop="head" wear={wearFor(p)} />
                     <span className="m-name">{p.name}</span>
-                    {timers[p.id] && <span className="m-timer" title={t("Timer läuft")}><Icon d={TIMER_D} /></span>}
+                    {timers[p.id] && settings.timer && <span className="m-timer" title={t("Timer läuft")}><Icon d={TIMER_D} /></span>}
                     {c > 0 && <span className="count">{c}</span>}
                   </button>
                   <button className="m-act" onClick={() => openEdit(p)} title={t("Bearbeiten")} aria-label={t("{name} bearbeiten", { name: p.name })}>
@@ -1175,20 +1569,18 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           ) : (
             <button className="m-add" onClick={() => setFolderEdit({ id: null, name: "" })}>{t("+ Neuer Ordner")}</button>
           )}
-          <button
-            className="m-add m-settings"
-            onClick={() => {
-              setMenu(null);
-              setSettingsOpen(true);
-            }}
-          >
-            {t("Einstellungen…")}
-          </button>
+          {settings.game && (
+            <button className="m-add m-break" onClick={() => openGame()}>
+              <Icon d="M2.5 11.5h11M4 11.5V9h8v2.5M5 9V6.5h6V9M6.5 6.5V4.5h3v2" />
+              {t("Pause machen")}
+            </button>
+          )}
         </div>
       )}
       </nav>
+      )}
 
-      {project && timerOpen && (
+      {project && timerOpen && settings.timer && (
         <section className="timer">
           {timer ? (
             <>
@@ -1264,7 +1656,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
         </div>
       )}
 
-      {view !== "plan" && exams.length > 0 && (
+      {(view === "list" || view === "today") && exams.length > 0 && (
         <button
           className={daysUntil(exams[0].date) <= 3 ? "exam-banner soon" : "exam-banner"}
           onClick={() => {
@@ -1298,11 +1690,9 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           projects={data.projects}
           lectures={data.lectures}
           focus={calFocus}
-          onOpenTask={t => {
-            const p = data.projects.find(pp => pp.id === t.projectId);
-            if (p) selectProject(p);
-            setView("list");
-          }}
+          onOpenTask={goToTask}
+          onImport={settings.icsImport ? importIcs : undefined}
+          importMsg={settings.icsImport ? icsMsg : null}
         />
       ) : view === "plan" ? (
         <Timetable
@@ -1317,6 +1707,32 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
             selectProject(p);
             setWeek(false);
             setView("list");
+          }}
+        />
+      ) : view === "today" ? (
+        <TodayView
+          tasks={data.tasks}
+          projects={data.projects}
+          events={data.events}
+          lectures={data.lectures}
+          leaving={leaving}
+          wearFor={wearFor}
+          onComplete={complete}
+          onOpen={goToTask}
+          onOpenDay={date => {
+            setCalFocus(date);
+            setPlanTab("month");
+            setView("plan");
+          }}
+        />
+      ) : view === "search" ? (
+        <SearchView
+          data={data}
+          onOpenTask={goToTask}
+          onOpenEvent={e => {
+            setCalFocus(e.date);
+            setPlanTab("month");
+            setView("plan");
           }}
         />
       ) : !project ? (
@@ -1350,7 +1766,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
             <ul className="list">
               {open.map(task => {
                 const subs = subsOf(task.id);
-                const cls = ["task", leaving.includes(task.id) && "leaving", dragId === task.id && "dragging", task.due && daysUntil(task.due) < 0 && "late"].filter(Boolean).join(" ");
+                const cls = ["task", leaving.includes(task.id) && "leaving", dragId === task.id && "dragging", task.due && daysUntil(task.due) < 0 && "late", flashId === task.id && "flash"].filter(Boolean).join(" ");
                 return (
                   <li key={task.id} data-id={task.id} className={cls} onPointerDown={e => onRowPointerDown(e, task)}>
                     {renderTask(task, false)}
@@ -1360,7 +1776,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
                           <li
                             key={s.id}
                             data-id={s.id}
-                            className={["sub", leaving.includes(s.id) && "leaving", dragId === s.id && "dragging"].filter(Boolean).join(" ")}
+                            className={["sub", leaving.includes(s.id) && "leaving", dragId === s.id && "dragging", flashId === s.id && "flash"].filter(Boolean).join(" ")}
                             onPointerDown={e => onRowPointerDown(e, s)}
                           >
                             {renderTask(s, true)}
@@ -1485,12 +1901,41 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
                     onClick={() => setDlgAnimal(a.kind)}
                     aria-pressed={a.kind === dlgAnimal}
                   >
-                    <Pet kind={a.kind} mood="relaxed" still />
+                    <Pet kind={a.kind} mood="relaxed" still wear={dlgWear && settings.accessories && unlocked(dlgWear, data.doneTotal) ? { accessory: dlgWear } : undefined} />
                     <span>{animalName(a.kind)}</span>
                   </button>
                 ))}
               </div>
             </div>
+            {settings.accessories && (
+              <div className="field">
+                {t("Accessoire")}
+                <div className="pick wear-pick">
+                  <button type="button" className={!dlgWear ? "pick-one on" : "pick-one"} onClick={() => setDlgWear(undefined)} aria-pressed={!dlgWear}>
+                    <Pet kind={dlgAnimal} mood="relaxed" still crop="head" />
+                    <span>{t("Ohne")}</span>
+                  </button>
+                  {ACCESSORIES.map(a => {
+                    const ok = unlocked(a.id, data.doneTotal);
+                    return (
+                      <button
+                        type="button"
+                        key={a.id}
+                        className={["pick-one", dlgWear === a.id && "on", !ok && "locked"].filter(Boolean).join(" ")}
+                        onClick={() => ok && setDlgWear(a.id)}
+                        aria-pressed={dlgWear === a.id}
+                        aria-disabled={!ok}
+                        title={ok ? t(a.name) : t("Noch {n} erledigte Aufgaben", { n: a.need - data.doneTotal })}
+                      >
+                        <Pet kind={dlgAnimal} mood="relaxed" still crop="head" wear={{ accessory: a.id }} />
+                        <span>{ok ? t(a.name) : t("ab {n}", { n: a.need })}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="wear-note">{t("{n} Aufgaben erledigt. Neue Accessoires gibt es fürs Weitermachen, ganz ohne Eile.", { n: data.doneTotal })}</span>
+              </div>
+            )}
             <div className="actions">
               {editingProject && (
                 <button
@@ -1510,12 +1955,31 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
       )}
 
       {bubble && <span className="bubble in-bar" key={bubble.at}>{bubble.text}</span>}
-      {lab && <PetLab kind={theme} onClose={() => setLab(false)} />}
+      {lab && <PetLab kind={theme} onClose={() => setLab(false)} onGame={demo => openGame(demo)} />}
+      {game && (
+        <DamGame
+          key={game.key}
+          animal={theme}
+          wear={wearFor(project)}
+          calm={settings.calm}
+          sound={settings.gameSound}
+          onSound={on => setSettings(st => ({ ...st, gameSound: on }))}
+          scores={data.dam}
+          onSave={saveScore}
+          demo={game.demo}
+          onClose={closeGame}
+          onDrag={() => {
+            forgetHome();
+            win.startDragging();
+          }}
+        />
+      )}
       {settingsOpen && (
         <SettingsDialog
-          language={settings.language}
-          calm={settings.calm}
-          bubbles={settings.bubbles}
+          settings={settings}
+          shortcutFailed={shortcutFailed}
+          onImportIcs={importIcs}
+          icsMessage={icsMsg}
           onChange={patch => setSettings(st => ({ ...st, ...patch }))}
           onExport={doExport}
           onImport={doImport}
@@ -1526,6 +1990,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
             setSettingsOpen(false);
             setConfirmImport(false);
             setBackupMsg(null);
+            setIcsMsg(null);
           }}
         />
       )}

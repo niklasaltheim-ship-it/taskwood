@@ -6,6 +6,8 @@ import { H, W, rgba } from "./render";
 import { SPECIES } from "./species";
 import type { Frame, MoodState, Species } from "./types";
 import { t } from "../i18n";
+import { wearProps } from "./wear";
+import type { Wear } from "./wear";
 
 export const clipNames = (kind: AnimalKind) => Object.keys(SPECIES[kind].clips);
 export const stashName = (kind: AnimalKind, n: number) => {
@@ -29,6 +31,7 @@ type Props = {
   forceHover?: boolean;
   forceCuddle?: boolean;
   stash?: number; // erledigte Aufgaben der letzten Tage als Vorrat neben dem Tier
+  wear?: Wear; // Accessoire und Jahreszeiten-Deko
 };
 
 const CUDDLE_AFTER = 1400; // ms Mausstillstand
@@ -50,11 +53,12 @@ export default function Pet(props: Props) {
   return <Engine sp={sp} {...props} />;
 }
 
-function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, crop, reduced, forceHover, forceCuddle, stash = 0 }: Props & { sp: Species }) {
+function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, crop, reduced, forceHover, forceCuddle, stash = 0, wear }: Props & { sp: Species }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const live = useRef({ mood, held, stash, hover: false, cuddle: false, gaze: [0, 0] as [number, number] });
+  const live = useRef({ mood, held, stash, wear, hover: false, cuddle: false, gaze: [0, 0] as [number, number] });
   live.current.mood = mood;
   live.current.stash = stash;
+  live.current.wear = wear;
   live.current.held = held;
   if (forceHover !== undefined) live.current.hover = forceHover;
   if (forceCuddle !== undefined) live.current.cuddle = forceCuddle;
@@ -80,11 +84,14 @@ function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, 
     else ctx.putImageData(img, 0, 0);
   };
 
-  // Vorrat liegt immer daneben (nicht bei Icons)
+  // Vorrat liegt immer daneben (nicht bei Icons), dazu Accessoire und Jahreszeit
   const withStash = (f: Frame): Frame => {
     const n = Math.min(STASH_MAX, live.current.stash);
-    if (crop || !sp.stash || n <= 0) return f;
-    return { ...f, props: [...(f.props ?? []), `stash${n}`] };
+    const w = live.current.wear;
+    const extra = w ? wearProps(w, f, isStatic ? 0 : Math.floor(performance.now() / 450), !!crop) : [];
+    const stashed = !crop && sp.stash && n > 0 ? [`stash${n}`] : [];
+    if (!extra.length && !stashed.length) return f;
+    return { ...f, props: [...(f.props ?? []), ...stashed, ...extra] };
   };
   const stillFrame = (m: MoodState): Frame => withStash(sp.stills?.[m] ?? STILLS[m]);
 
@@ -192,9 +199,10 @@ function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, 
     else reconsider();
   }, [mood]);
 
+  const wearKey = `${wear?.accessory}|${wear?.season}`;
   useEffect(() => {
     if (isStatic) draw(stillFrame(mood));
-  }, [stash]);
+  }, [stash, wearKey]);
 
   useEffect(() => {
     if (isStatic) return;

@@ -15,6 +15,8 @@ type Props = {
   lectures: Lecture[];
   focus?: string | null; // Tag, der beim Öffnen gewählt sein soll
   onOpenTask: (task: Task) => void;
+  onImport?: () => void; // Kalender-Import (.ics), falls eingeschaltet
+  importMsg?: string | null;
 };
 
 type Draft = {
@@ -39,7 +41,7 @@ const fromIso = (s: string) => {
   return new Date(y, m - 1, d);
 };
 
-export default function Calendar({ events, onEvents, tasks, projects, lectures, focus, onOpenTask }: Props) {
+export default function Calendar({ events, onEvents, tasks, projects, lectures, focus, onOpenTask, onImport, importMsg }: Props) {
   const todayIso = iso(new Date());
   const [selected, setSelected] = useState(focus ?? todayIso);
   const [month, setMonth] = useState(() => {
@@ -170,8 +172,14 @@ export default function Calendar({ events, onEvents, tasks, projects, lectures, 
         <strong className="cal-month">{first.toLocaleDateString(locale(), { month: "long", year: "numeric" })}</strong>
         <button className="cal-nav" onClick={() => shiftMonth(1)} aria-label={t("Nächster Monat")}>›</button>
         <span className="spacer" />
+        {onImport && (
+          <button className="tt-toggle" onClick={onImport} title={t("Termine aus einer .ics-Datei übernehmen")}>
+            {t("Import")}
+          </button>
+        )}
         <button className="tt-toggle" onClick={goToday}>{t("Heute")}</button>
       </div>
+      {importMsg && <p className="cal-note">{importMsg}</p>}
 
       <div className="cal-grid">
         {week.map(w => (

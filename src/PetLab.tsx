@@ -5,6 +5,7 @@ import type { MoodState } from "./pet/types";
 import { ANIMALS, animalName } from "./sprites";
 import type { AnimalKind } from "./sprites";
 import { t } from "./i18n";
+import type { DemoMode } from "./game/DamGame";
 
 // Versteckte Testansicht (Strg+Shift+D): jede Stimmung und jedes Ereignis per Klick abspielen
 
@@ -27,7 +28,16 @@ const EVENTS: [string, string][] = [
   ["land", "Losgelassen"],
 ];
 
-export default function PetLab({ kind: initial, onClose }: { kind: AnimalKind; onClose: () => void }) {
+const GAME: [DemoMode | null, string][] = [
+  [null, "Spiel starten"],
+  ["perfect", "Perfekt-Serie"],
+  ["close", "Knapp getroffen"],
+  ["miss", "Verfehlt"],
+  ["record", "Neuer Rekord"],
+  ["pause", "Pause"],
+];
+
+export default function PetLab({ kind: initial, onClose, onGame }: { kind: AnimalKind; onClose: () => void; onGame: (demo: DemoMode | null) => void }) {
   const [kind, setKind] = useState<AnimalKind>(initial);
   const [mood, setMood] = useState<MoodState>("relaxed");
   const [event, setEvent] = useState<PetEvent | null>(null);
@@ -97,6 +107,12 @@ export default function PetLab({ kind: initial, onClose }: { kind: AnimalKind; o
         <span>{t("Einzelne Clips")}</span>
         {clipNames(kind).map(c => (
           <button key={c} className="chip small" onClick={() => fire(c)}>{c}</button>
+        ))}
+      </div>
+      <div className="lab-group">
+        <span>{t("Dammbau (Vorführung, speichert nichts)")}</span>
+        {GAME.map(([d, label]) => (
+          <button key={label} className="chip small" onClick={() => onGame(d)}>{t(label)}</button>
         ))}
       </div>
       <p className="lab-note">{t("Maus über das Tier bewegen: die Augen folgen. Stillhalten: es schmiegt sich an.")}</p>

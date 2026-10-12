@@ -17,7 +17,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "THIRD_PARTY_LICENSES.txt")
-NPM_RUNTIME = ["react", "react-dom", "scheduler", "@tauri-apps/api", "@tauri-apps/plugin-notification", "@tauri-apps/plugin-dialog"]
+NPM_RUNTIME = ["react", "react-dom", "scheduler", "@tauri-apps/api", "@tauri-apps/plugin-notification", "@tauri-apps/plugin-dialog", "@tauri-apps/plugin-global-shortcut", "@tauri-apps/plugin-autostart"]
 LICENSE_FILE = re.compile(r"^(licen[cs]e|copying|copyright|notice)([-_.].*)?$", re.I)
 
 

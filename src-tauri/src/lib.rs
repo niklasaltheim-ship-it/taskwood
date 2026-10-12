@@ -1,13 +1,18 @@
 use std::path::Path;
+use tauri::{Manager, WindowEvent};
 
 // Datensicherung: Lesen und Schreiben einer vom Nutzer gewählten JSON-Datei.
-// Nur .json, damit die Befehle nicht als allgemeiner Dateizugriff dienen können.
-fn json_path(path: &str) -> Result<&Path, String> {
+// Nur bestimmte Endungen, damit die Befehle nicht als allgemeiner Dateizugriff dienen können.
+fn checked_path<'a>(path: &'a str, ext: &str) -> Result<&'a Path, String> {
     let p = Path::new(path);
     match p.extension().and_then(|e| e.to_str()) {
-        Some(ext) if ext.eq_ignore_ascii_case("json") => Ok(p),
-        _ => Err("Nur .json-Dateien sind erlaubt".into()),
+        Some(e) if e.eq_ignore_ascii_case(ext) => Ok(p),
+        _ => Err(format!("Nur .{ext}-Dateien sind erlaubt")),
     }
+}
+
+fn json_path(path: &str) -> Result<&Path, String> {
+    checked_path(path, "json")
 }
 
 #[tauri::command]
@@ -18,6 +23,13 @@ fn write_text(path: String, contents: String) -> Result<(), String> {
 #[tauri::command]
 fn read_text(path: String) -> Result<String, String> {
     std::fs::read_to_string(json_path(&path)?).map_err(|e| e.to_string())
+}
+
+// Kalender-Import: nur .ics-Dateien lesen
+#[tauri::command]
+fn read_ics(path: String) -> Result<String, String> {
+    let bytes = std::fs::read(checked_path(&path, "ics")?).map_err(|e| e.to_string())?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
 // Startparameter für Sicherung ohne Klicks: --export <datei> bzw. --import <datei>
@@ -37,6 +49,14 @@ fn third_party_licenses() -> &'static str {
     include_str!("../../THIRD_PARTY_LICENSES.txt")
 }
 
+// Position und Größe in einem Schritt setzen (logische Pixel), z. B. wenn ein Besuch das kleine
+// Fenster nach links verbreitert: so springt das Tier nicht zwischen den beiden Änderungen.
+#[tauri::command]
+fn set_bounds(window: tauri::WebviewWindow, x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
+    window.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
+    window.set_position(tauri::LogicalPosition::new(x, y)).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn quit(app: tauri::AppHandle) {
     app.exit(0);
@@ -47,7 +67,19 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![write_text, read_text, cli_task, third_party_licenses, quit])
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
+        // Hauptfenster zu: ganze App beenden (sonst lebt das versteckte Schnelleingabe-Fenster weiter).
+        // Schnelleingabe mit Alt+F4: nur verstecken, damit das Tastenkürzel weiter funktioniert.
+        .on_window_event(|window, event| match event {
+            WindowEvent::CloseRequested { api, .. } if window.label() == "quick" => {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+            WindowEvent::Destroyed if window.label() == "main" => window.app_handle().exit(0),
+            _ => {}
+        })
+        .invoke_handler(tauri::generate_handler![write_text, read_text, read_ics, set_bounds, cli_task, third_party_licenses, quit])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

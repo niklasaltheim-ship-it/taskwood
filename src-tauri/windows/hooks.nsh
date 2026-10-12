@@ -5,3 +5,8 @@
   DeleteRegKey HKCU "Software\Drahtgeber\Taskwood"
   DeleteRegKey /ifempty HKCU "Software\Drahtgeber"
 !macroend
+
+; Autostart-Eintrag (Einstellung "Mit Windows starten") beim Deinstallieren entfernen
+!macro NSIS_HOOK_PREUNINSTALL
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Taskwood"
+!macroend

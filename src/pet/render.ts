@@ -1,5 +1,6 @@
 import { BROWS, EYES, MOUTHS } from "./face";
-import type { Arm, Eye, Frame, Map, Part, Species } from "./types";
+import type { Arm, Eye, Frame, Map, Part, Prop, Species } from "./types";
+import { WEAR_COLORS, WEAR_PROPS } from "./wear";
 
 // Leinwand in Tier-Pixeln. Das 32er-Raster der Teile sitzt bei (OX, OY); oben bleibt Platz für
 // Sprünge, Ohren und den Wecker.
@@ -74,6 +75,8 @@ function turnHead(head: Map, turn: number, rows: [number, number], muzzle: strin
 }
 
 export function compose(sp: Species, f: Frame): Grid {
+  // Requisiten des Tiers, sonst gemeinsame (Accessoires, Jahreszeiten)
+  const prop = (name: string): Prop | undefined => sp.props[name] ?? WEAR_PROPS[name];
   const main: Grid = new Array(W * H).fill(null);
   const over: Grid = new Array(W * H).fill(null);
   const fx = OX + (f.x ?? 0);
@@ -83,9 +86,10 @@ export function compose(sp: Species, f: Frame): Grid {
   const body = f.body ?? "sit";
   // Eingerollt (Igel): nur die Kugel
   if (body === "ball" && sp.bodies.ball) {
+    for (const p of (f.props ?? []).map(parseProp).filter(p => prop(p.name)?.layer === "ground")) stamp(main, prop(p.name)!.map, OX + prop(p.name)!.x + p.dx, OY + prop(p.name)!.y + p.dy);
     at(main, sp.bodies.ball);
     outline(main);
-    for (const p of (f.props ?? []).map(parseProp).filter(p => sp.props[p.name]?.layer === "over")) at(over, sp.props[p.name], p.dx, p.dy);
+    for (const p of (f.props ?? []).map(parseProp).filter(p => prop(p.name)?.layer === "over")) at(over, prop(p.name)!, p.dx, p.dy);
     for (let i = 0; i < over.length; i++) if (over[i]) main[i] = over[i];
     return main;
   }
@@ -99,16 +103,16 @@ export function compose(sp: Species, f: Frame): Grid {
   const headX = sp.head.x + hx;
   const headY = sp.head.y + hy;
   const headW = width(sp.head.map);
-  const props = (f.props ?? []).map(parseProp).filter(p => sp.props[p.name]);
-  const propsIn = (layer: string) => props.filter(p => sp.props[p.name].layer === layer);
+  const props = (f.props ?? []).map(parseProp).filter(p => prop(p.name));
+  const propsIn = (layer: string) => props.filter(p => prop(p.name)!.layer === layer);
 
   // 0. Vorrat am Boden, unabhängig von Sprüngen
-  for (const p of propsIn("ground")) stamp(main, sp.props[p.name].map, OX + sp.props[p.name].x + p.dx, OY + sp.props[p.name].y + p.dy);
+  for (const p of propsIn("ground")) stamp(main, prop(p.name)!.map, OX + prop(p.name)!.x + p.dx, OY + prop(p.name)!.y + p.dy);
 
   // 1. hinten: Schwanz, Requisiten hinter der Figur
   const tail = curled ? "front" : f.tail ?? "down";
   if (!back && tail !== "none" && !curled && sp.tails[tail]) at(main, sp.tails[tail]!);
-  for (const p of propsIn("back")) at(main, sp.props[p.name], p.dx, p.dy);
+  for (const p of propsIn("back")) at(main, prop(p.name)!, p.dx, p.dy);
 
   // 2. Körper und Füße
   const bodyPart = sp.bodies[body] ?? sp.bodies.sit!;
@@ -133,7 +137,7 @@ export function compose(sp: Species, f: Frame): Grid {
   // Rückansicht: Schwanz bzw. Stacheln liegen über dem Hinterkopf
   if (back && sp.tails.back) at(main, sp.tails.back);
 
-  for (const p of propsIn("mid")) at(main, sp.props[p.name], p.dx + hx, p.dy + hy);
+  for (const p of propsIn("mid")) at(main, prop(p.name)!, p.dx + hx, p.dy + hy);
 
   // 4. Gesicht
   if (!back) {
@@ -170,7 +174,7 @@ export function compose(sp: Species, f: Frame): Grid {
   }
 
   // 5. Requisiten vorne, dann Pfoten
-  for (const p of propsIn("main")) at(main, sp.props[p.name], p.dx, p.dy);
+  for (const p of propsIn("main")) at(main, prop(p.name)!, p.dx, p.dy);
   const arms: [Arm, Arm] = curled ? ["none", "none"] : Array.isArray(f.arms) ? f.arms : [f.arms ?? "rest", f.arms ?? "rest"];
   const showArm = (a: Arm) => a !== "none" && !(back && (a === "rest" || a === "hold" || a === "mouth"));
   if (showArm(arms[0]) && sp.arms[arms[0]]) at(main, sp.arms[arms[0]]!, 0, lift);
@@ -182,7 +186,7 @@ export function compose(sp: Species, f: Frame): Grid {
   outline(main);
 
   // 6. Schwebendes ohne Kontur der Figur
-  for (const p of propsIn("over")) at(over, sp.props[p.name], p.dx, p.dy);
+  for (const p of propsIn("over")) at(over, prop(p.name)!, p.dx, p.dy);
   for (let i = 0; i < over.length; i++) if (over[i]) main[i] = over[i];
 
   if (f.flip) {
@@ -210,7 +214,7 @@ export function rgba(sp: Species, f: Frame, key: string): Uint8ClampedArray {
   for (let i = 0; i < g.length; i++) {
     const ch = g[i];
     if (!ch) continue;
-    const col = sp.colors[ch];
+    const col = sp.colors[ch] ?? WEAR_COLORS[ch];
     if (!col) continue;
     const v = (rgb[ch] ??= hex(col));
     out[i * 4] = v[0];
