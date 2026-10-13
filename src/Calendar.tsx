@@ -6,6 +6,7 @@ import { countdown, eventsOn, REMIND_OPTIONS } from "./events";
 import { hhmm, hm, lecturesOn, toMin } from "./schedule";
 import type { Lecture } from "./schedule";
 import { lang, locale, t } from "./i18n";
+import type { LogDot } from "./logbook";
 
 type Props = {
   events: CalEvent[];
@@ -17,6 +18,10 @@ type Props = {
   onOpenTask: (task: Task) => void;
   onImport?: () => void; // Kalender-Import (.ics), falls eingeschaltet
   importMsg?: string | null;
+  logDots: Record<string, LogDot[]>; // Logbücher je Tag
+  showLogs: boolean;
+  onShowLogs: (on: boolean) => void;
+  onOpenLog: (projectId: string, date: string) => void;
 };
 
 type Draft = {
@@ -41,7 +46,7 @@ const fromIso = (s: string) => {
   return new Date(y, m - 1, d);
 };
 
-export default function Calendar({ events, onEvents, tasks, projects, lectures, focus, onOpenTask, onImport, importMsg }: Props) {
+export default function Calendar({ events, onEvents, tasks, projects, lectures, focus, onOpenTask, onImport, importMsg, logDots, showLogs, onShowLogs, onOpenLog }: Props) {
   const todayIso = iso(new Date());
   const [selected, setSelected] = useState(focus ?? todayIso);
   const [month, setMonth] = useState(() => {
@@ -93,6 +98,22 @@ export default function Calendar({ events, onEvents, tasks, projects, lectures, 
           {dayEvents.filter(e => !e.exam).slice(0, 2).map(e => <i key={e.id} className="dot dot-ev" />)}
           {dayTasks.slice(0, 3).map(t => <i key={t.id} className={late ? "dot dot-late" : "dot dot-task"} />)}
         </span>
+        {showLogs && logDots[date] && (
+          <span className="cal-logs">
+            {logDots[date].slice(0, 4).map(l => (
+              <i
+                key={l.projectId}
+                className="dot-log"
+                style={{ background: l.color }}
+                title={t("Logbuch · {name}", { name: l.name }) + ` (${l.count})`}
+                onClick={e => {
+                  e.stopPropagation();
+                  onOpenLog(l.projectId, date);
+                }}
+              />
+            ))}
+          </span>
+        )}
       </button>
     );
   };
@@ -163,7 +184,8 @@ export default function Calendar({ events, onEvents, tasks, projects, lectures, 
   const dayLectures = weekday >= 1 && weekday <= 5 ? lecturesOn(lectures, weekday) : [];
   const selLabel = sel.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
   const week = lang() === "de" ? ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const empty = !dayEvents.length && !dayTasks.length && !dayLectures.length;
+  const dayLogs = showLogs ? logDots[selected] ?? [] : [];
+  const empty = !dayEvents.length && !dayTasks.length && !dayLectures.length && !dayLogs.length;
 
   return (
     <main className="body calendar">
@@ -179,6 +201,11 @@ export default function Calendar({ events, onEvents, tasks, projects, lectures, 
         )}
         <button className="tt-toggle" onClick={goToday}>{t("Heute")}</button>
       </div>
+      <label className="cal-filter">
+        <input type="checkbox" checked={showLogs} onChange={e => onShowLogs(e.target.checked)} />
+        <span className="dot-log sample" />
+        {t("Logbücher anzeigen")}
+      </label>
       {importMsg && <p className="cal-note">{importMsg}</p>}
 
       <div className="cal-grid">
@@ -222,6 +249,13 @@ export default function Calendar({ events, onEvents, tasks, projects, lectures, 
             <span className="cal-sub">
               {[projectName(task.projectId), task.repeat ? `↻ ${repeatLabel(task.repeat)}` : null].filter(Boolean).join(" · ")}
             </span>
+          </button>
+        ))}
+        {dayLogs.map(l => (
+          <button key={l.projectId} className="cal-item cal-logitem" style={{ "--lec": l.color } as CSSProperties} onClick={() => onOpenLog(l.projectId, selected)} title={t("Logbuch öffnen")}>
+            <span className="cal-time">{t("Logbuch")}</span>
+            <span className="cal-title">{l.name}</span>
+            <span className="cal-sub">{t(l.count === 1 ? "1 Eintrag" : "{n} Einträge", { n: l.count })}</span>
           </button>
         ))}
         {dayLectures.map(l => (

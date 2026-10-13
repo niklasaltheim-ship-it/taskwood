@@ -9,7 +9,15 @@ import { emptyScores, sanitizeScores } from "./game/scores";
 import type { DamScores } from "./game/scores";
 
 export type Folder = { id: string; name: string; last?: string }; // last: zuletzt gewähltes Projekt
-export type Project = { id: string; folderId: string; name: string; animal: AnimalKind; wear?: Accessory };
+export type Project = {
+  id: string;
+  folderId: string;
+  name: string;
+  animal: AnimalKind;
+  wear?: Accessory;
+  logHidden?: boolean; // Logbuch in diesem Projekt ausgeblendet
+  logCollapsed?: boolean; // Logbuch eingeklappt
+};
 export type Prio = 1 | 2 | 3;
 export type Repeat = "daily" | "weekly" | "monthly";
 
@@ -41,7 +49,29 @@ export type Task = {
   prio?: Prio;
   note?: string;
   repeat?: Repeat; // wiederkehrend; beim Abhaken entsteht die nächste Aufgabe
+  sketch?: Sketch; // Skizzenfeld zur Aufgabe
+  log?: string; // Logbuch: Tag (YYYY-MM-DD), an dem die Aufgabe ins Logbuch kam
 };
+
+// Skizze: Striche (p = x,y,x,y,… in logischen Koordinaten, e = Radierer) und Texte
+export type SketchItem =
+  | { k: "s"; c: string; w: number; e?: 1; p: number[] }
+  | { k: "t"; c: string; s: number; x: number; y: number; t: string; w?: number }; // Text: x/y oben links, w = Umbruchbreite
+export type Sketch = { items: SketchItem[]; bg?: "plain" | "lines" | "grid"; at: number };
+
+const validItem = (i: any): i is SketchItem =>
+  i &&
+  typeof i.c === "string" &&
+  ((i.k === "s" && Number.isFinite(i.w) && Array.isArray(i.p) && i.p.length >= 2 && i.p.every(Number.isFinite)) ||
+    (i.k === "t" && typeof i.t === "string" && [i.s, i.x, i.y].every(Number.isFinite)));
+
+// Ungültige Teile verwerfen; leere Skizze = keine
+function sanitizeSketch(s: any): Sketch | undefined {
+  if (!s || !Array.isArray(s.items)) return undefined;
+  const items = s.items.filter(validItem);
+  if (!items.length) return undefined;
+  return { items, bg: ["plain", "lines", "grid"].includes(s.bg) ? s.bg : "grid", at: Number.isFinite(s.at) ? s.at : Date.now() };
+}
 // Läuft: endsAt gesetzt. Pausiert: left gesetzt (Restzeit in ms).
 export type Timer = { duration: number; endsAt?: number; left?: number };
 export type Data = {
@@ -128,10 +158,16 @@ function sanitize(d: Data): Data {
     animal: isAnimal(p.animal) ? p.animal : "beaver",
     wear: isAccessory(p.wear) ? p.wear : undefined,
   }));
-  const tasks = (Array.isArray(d.tasks) ? d.tasks : []).map((t, i) => ({
-    ...t,
-    order: typeof t.order === "number" ? t.order : i,
-  }));
+  const tasks = (Array.isArray(d.tasks) ? d.tasks : []).map((t, i) => {
+    const task: Task = { ...t, order: typeof t.order === "number" ? t.order : i };
+    if ("log" in t && !(typeof t.log === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.log))) delete task.log;
+    if ("sketch" in t) {
+      const sketch = sanitizeSketch(t.sketch);
+      if (sketch) task.sketch = sketch;
+      else delete task.sketch;
+    }
+    return task;
+  });
   const timers = d.timers && typeof d.timers === "object" ? d.timers : {};
   const activeFolder = folderIds.has(d.activeFolder) ? d.activeFolder : folders[0].id;
   const inFolder = projects.filter(p => p.folderId === activeFolder);

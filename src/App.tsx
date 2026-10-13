@@ -37,13 +37,16 @@ import SettingsDialog from "./SettingsDialog";
 import DamGame from "./game/DamGame";
 import type { DemoMode } from "./game/DamGame";
 import { addScore } from "./game/scores";
+import SketchEditor from "./SketchEditor";
+import LogMonth from "./LogMonth";
+import { dayOf, logDots, projectColor, sinceLabel } from "./logbook";
 import "./App.css";
 import "./extras.css";
 
 type Dialog = { mode: "new" } | { mode: "edit"; id: string };
 type HistRow = { task: Task; subs: Task[]; parent?: string };
 type Menu = null | "folders" | "projects" | "main";
-type View = "list" | "history" | "plan" | "today" | "search";
+type View = "list" | "history" | "plan" | "today" | "search" | "log";
 type Undo = { ids: string[]; text: string; spawned: string[] }; // spawned: Folgeaufgaben wiederkehrender Aufgaben
 
 const win = getCurrentWindow();
@@ -172,7 +175,11 @@ export default function App() {
   const [guestEvent, setGuestEvent] = useState<PetEvent | null>(null);
   const [guestBubble, setGuestBubble] = useState<{ text: string; at: number } | null>(null);
   const [visitSide, setVisitSide] = useState<"left" | "right" | null>(null);
-  const [game, setGame] = useState<{ demo: DemoMode | null; key: number } | null>(null); // eingeklappt: Fenster für den Gast verbreitert
+  const [game, setGame] = useState<{ demo: DemoMode | null; key: number } | null>(null);
+  const [sketchFor, setSketchFor] = useState<string | null>(null); // Aufgabe, deren Skizzenfeld offen ist
+  const [logInput, setLogInput] = useState("");
+  const [logFocus, setLogFocus] = useState<string | null>(null); // Tag in der Logbuch-Monatsansicht
+  const [dlgLog, setDlgLog] = useState(true); // eingeklappt: Fenster für den Gast verbreitert
   const visitSideRef = useRef<"left" | "right" | null>(null);
   const winChain = useRef<Promise<unknown>>(Promise.resolve());
   const lastBubble = useRef(0);
@@ -273,8 +280,12 @@ export default function App() {
   const openIn = (projectId: string) =>
     data.tasks.filter(t => t.projectId === projectId && !t.parentId && !t.doneAt).sort(byOrder);
   const subsOf = (id: string) => data.tasks.filter(t => t.parentId === id && !t.doneAt).sort(byOrder);
-  const open = project ? openIn(project.id) : [];
-  const count = open.length;
+  const allOpen = project ? openIn(project.id) : [];
+  const count = allOpen.length; // Logbuch zählt mit (Zähler, Stimmung)
+  const open = allOpen.filter(t => !t.log);
+  // Logbuch: alle offenen Logbuch-Aufgaben (auch von früheren Tagen) plus heute erledigte
+  const logOpen = allOpen.filter(t => t.log);
+  const logDoneToday = project ? data.tasks.filter(t => t.projectId === project.id && t.log && !t.parentId && t.doneAt && dayOf(t.doneAt) === isoToday()) : [];
   const theme: AnimalKind = project?.animal ?? "beaver";
 
   // Vorrat: erledigte Aufgaben der letzten Tage
@@ -551,6 +562,25 @@ export default function App() {
     if (Math.random() < 0.5) say(t(pick(["Oh, was Neues!", "Notiert!", "Machen wir!", "Kommt auf die Liste!", "Klingt gut!"])), REACT_GAP);
   };
 
+  const logParsed = logInput.trim() ? parseTask(logInput) : null;
+  const addLogTask = () => {
+    if (!project || !logParsed) return;
+    const { text, due, prio, repeat } = logParsed;
+    const order = nextOrder();
+    setData(d => ({ ...d, tasks: [...d.tasks, { id: uid(), projectId: project.id, text, createdAt: Date.now(), order, due, prio, repeat, log: isoToday() }] }));
+    setLogInput("");
+    petDo("added");
+    if (Math.random() < 0.5) say(t(pick(["Notiert!", "Kommt ins Logbuch!", "Machen wir!"])), REACT_GAP);
+  };
+  const setProjectFlag = (id: string, patch: Partial<Project>) =>
+    setData(d => ({ ...d, projects: d.projects.map(p => (p.id === id ? { ...p, ...patch } : p)) }));
+  const openLog = (projectId: string, date: string | null) => {
+    const p = data.projects.find(pp => pp.id === projectId);
+    if (p) selectProject(p);
+    setLogFocus(date ?? isoToday());
+    setView("log");
+  };
+
   const addSub = (parent: Task) => {
     if (!subInput.trim()) return;
     const { text, due, prio, repeat } = parseTask(subInput);
@@ -594,7 +624,7 @@ export default function App() {
     if (task.repeat && task.due) {
       const copyId = uid();
       const base = nextOrder();
-      spawned.push({ ...task, id: copyId, due: nextDue(task.due, task.repeat), createdAt: Date.now(), doneAt: undefined });
+      spawned.push({ ...task, id: copyId, due: nextDue(task.due, task.repeat), createdAt: Date.now(), doneAt: undefined, ...(task.log && { log: isoToday() }) });
       data.tasks
         .filter(t => t.parentId === task.id && !t.doneAt)
         .forEach((s, i) => spawned.push({ ...s, id: uid(), parentId: copyId, createdAt: Date.now(), order: base + i + 1 }));
@@ -656,7 +686,7 @@ export default function App() {
   const moveTo = (task: Task, index: number) =>
     setData(d => {
       const sibs = d.tasks
-        .filter(t => t.projectId === task.projectId && t.parentId === task.parentId && !t.doneAt && t.id !== task.id)
+        .filter(t => t.projectId === task.projectId && t.parentId === task.parentId && !t.doneAt && t.id !== task.id && (!!task.parentId || !t.log === !task.log))
         .sort(byOrder);
       sibs.splice(index, 0, task);
       const orders = sibs.map(t => d.tasks.find(x => x.id === t.id)!.order).sort((a, b) => a - b);
@@ -767,6 +797,7 @@ export default function App() {
     setDlgName("");
     setDlgAnimal("beaver");
     setDlgWear(undefined);
+    setDlgLog(true);
     setConfirmDel(false);
     setMenu(null);
   };
@@ -777,6 +808,7 @@ export default function App() {
     setDlgAnimal(p.animal);
     setDlgFolder(p.folderId);
     setDlgWear(p.wear);
+    setDlgLog(!p.logHidden);
     setConfirmDel(false);
     setMenu(null);
   };
@@ -785,7 +817,7 @@ export default function App() {
     if (!dialog) return;
     const name = dlgName.trim();
     if (dialog.mode === "new") {
-      const p: Project = { id: uid(), folderId: folder.id, name: name || t("Neues Projekt"), animal: dlgAnimal, wear: dlgWear };
+      const p: Project = { id: uid(), folderId: folder.id, name: name || t("Neues Projekt"), animal: dlgAnimal, wear: dlgWear, logHidden: !dlgLog || undefined };
       setData(d => ({
         ...d,
         projects: [...d.projects, p],
@@ -796,7 +828,7 @@ export default function App() {
       const id = dialog.id;
       setData(d => {
         const projects = d.projects.map(p =>
-          p.id === id ? { ...p, name: name || p.name, animal: dlgAnimal, folderId: dlgFolder || p.folderId, wear: dlgWear } : p
+          p.id === id ? { ...p, name: name || p.name, animal: dlgAnimal, folderId: dlgFolder || p.folderId, wear: dlgWear, logHidden: !dlgLog || undefined } : p
         );
         // Projekt in anderen Ordner verschoben: dorthin mitgehen
         const moved = projects.find(p => p.id === id)!;
@@ -1118,6 +1150,9 @@ export default function App() {
   const goToTask = (task: Task) => {
     const p = data.projects.find(pp => pp.id === task.projectId);
     if (p) selectProject(p);
+    // Aufgabe im (eingeklappten) Logbuch: aufklappen, damit man sie sieht
+    const root = task.parentId ? data.tasks.find(x => x.id === task.parentId) : task;
+    if (p && root?.log && !task.doneAt && (p.logCollapsed || p.logHidden)) setProjectFlag(p.id, { logCollapsed: false, logHidden: false });
     setView(task.doneAt ? "history" : "list");
     if (!task.doneAt) setFlashId(task.id);
   };
@@ -1140,6 +1175,20 @@ export default function App() {
     const size = cardSize(true, false);
     await fitWindow(size.w, size.h);
   };
+  // Skizzenfeld: ebenfalls im großen Fenster
+  const openSketch = async (id: string) => {
+    setDetailsId(null);
+    setSketchFor(id);
+    const size = cardSize(true, false);
+    await fitWindow(size.w, size.h);
+  };
+  const closeSketch = async () => {
+    setSketchFor(null);
+    if (game) return;
+    const size = cardSize(settings.large, view === "plan" && planTab === "timetable" && week);
+    await fitWindow(size.w, size.h);
+  };
+
   const closeGame = async () => {
     setGame(null);
     const size = cardSize(settings.large, view === "plan" && planTab === "timetable" && week);
@@ -1257,8 +1306,9 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
             ) : (
               <span className="text">{task.text}</span>
             )}
-            {!editing && (task.due || task.note) && (
+            {!editing && (task.due || task.note || task.sketch || (task.log && task.log < isoToday() && !task.doneAt)) && (
               <span className="meta">
+                {task.log && task.log < isoToday() && !task.doneAt && <span className="log-since" title={t("Im Logbuch seit {d}", { d: task.log })}>{sinceLabel(task.log)}</span>}
                 {task.due && (
                   <span className={n < 0 ? "due late" : n === 0 ? "due today" : "due"} title={t(n < 0 ? "Überfällig seit " : "Fällig: ") + formatDueLong(task.due)}>
                     {formatDue(task.due)}
@@ -1270,12 +1320,25 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
                     {t("Notiz")}
                   </button>
                 )}
+                {task.sketch && (
+                  <button className="sketch-tag" onClick={() => openSketch(task.id)} title={t("Skizze öffnen")}>
+                    {t("Skizze")}
+                  </button>
+                )}
               </span>
             )}
           </div>
           {!sub && (
             <button className="add-sub" onClick={() => openSub(task.id)} title={t("Unteraufgabe hinzufügen")} aria-label={t("Unteraufgabe hinzufügen")}>+</button>
           )}
+          <button
+            className={task.sketch ? "sketch-btn has" : "sketch-btn"}
+            onClick={() => openSketch(task.id)}
+            title={t(task.sketch ? "Skizze öffnen" : "Skizzenfeld: zeichnen und schreiben")}
+            aria-label={t("Skizze öffnen")}
+          >
+            <svg viewBox="0 0 16 16"><path d="M10.5 2.5l3 3L6 13H3v-3zM9 4l3 3" /></svg>
+          </button>
           <button
             className={detailsId === task.id ? "more on" : "more"}
             onClick={() => setDetailsId(id => (id === task.id ? null : task.id))}
@@ -1343,6 +1406,51 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
     );
   };
 
+  // Aufgabenliste mit Unteraufgaben (für Logbuch und normale Liste)
+  const renderList = (list: Task[]) => (
+    <ul className="list">
+      {list.map(task => {
+        const subs = subsOf(task.id);
+        const cls = ["task", leaving.includes(task.id) && "leaving", dragId === task.id && "dragging", task.due && daysUntil(task.due) < 0 && "late", flashId === task.id && "flash"].filter(Boolean).join(" ");
+        return (
+          <li key={task.id} data-id={task.id} className={cls} onPointerDown={e => onRowPointerDown(e, task)}>
+            {renderTask(task, false)}
+            {(subs.length > 0 || subFor === task.id) && (
+              <ul className="subs">
+                {subs.map(s => (
+                  <li
+                    key={s.id}
+                    data-id={s.id}
+                    className={["sub", leaving.includes(s.id) && "leaving", dragId === s.id && "dragging", flashId === s.id && "flash"].filter(Boolean).join(" ")}
+                    onPointerDown={e => onRowPointerDown(e, s)}
+                  >
+                    {renderTask(s, true)}
+                  </li>
+                ))}
+                {subFor === task.id && (
+                  <li className="sub">
+                    <input
+                      className="sub-new"
+                      autoFocus
+                      value={subInput}
+                      onChange={e => setSubInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") addSub(task);
+                        if (e.key === "Escape") setSubFor(null);
+                      }}
+                      onBlur={() => setSubFor(null)}
+                      placeholder={t("Unteraufgabe, Enter zum Hinzufügen")}
+                    />
+                  </li>
+                )}
+              </ul>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+
   const editingProject = dialog?.mode === "edit" ? dialog.id : null;
   const exams = upcomingExams(data.events, EXAM_DAYS);
   const apptProjectBig = appt?.projectId ? data.projects.find(p => p.id === appt.projectId) : undefined;
@@ -1353,7 +1461,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
   const todayCount = settings.today ? dueToday(data.tasks).length : 0;
   const showPath = view === "list" || view === "history";
   const viewTitle = t(
-    { list: "Aufgaben", history: "Verlauf", today: "Heute", search: "Suche", plan: planTab === "month" ? "Kalender" : "Stundenplan" }[view]
+    { list: "Aufgaben", history: "Verlauf", today: "Heute", search: "Suche", log: "Logbuch", plan: planTab === "month" ? "Kalender" : "Stundenplan" }[view]
   );
   const visitorProject = visitor ? data.projects.find(p => p.id === visitor.id) : undefined;
   const visitMoodRaw = moodOf(visitorProject ?? null);
@@ -1693,6 +1801,10 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           onOpenTask={goToTask}
           onImport={settings.icsImport ? importIcs : undefined}
           importMsg={settings.icsImport ? icsMsg : null}
+          logDots={logDots(data.tasks, data.projects)}
+          showLogs={settings.calLogs}
+          onShowLogs={on => setSettings(st => ({ ...st, calLogs: on }))}
+          onOpenLog={openLog}
         />
       ) : view === "plan" ? (
         <Timetable
@@ -1735,6 +1847,14 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
             setView("plan");
           }}
         />
+      ) : view === "log" && project ? (
+        <main className="body">
+          <div className="log-title">
+            <Pet kind={project.animal} mood="relaxed" still crop="head" wear={wearFor(project)} />
+            <strong>{t("Logbuch · {name}", { name: project.name })}</strong>
+          </div>
+          <LogMonth tasks={data.tasks} projectId={project.id} color={projectColor(project)} focus={logFocus} onOpenTask={goToTask} />
+        </main>
       ) : !project ? (
         <main className="body">
           <p className="empty">{t("In „{folder}“ gibt es noch kein Projekt.", { folder: folder.name })}</p>
@@ -1742,6 +1862,64 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
         </main>
       ) : view === "list" ? (
         <main className="body">
+          {!project.logHidden && (
+            <section className={project.logCollapsed ? "logbook collapsed" : "logbook"} style={{ "--log": projectColor(project) } as CSSProperties}>
+              <div className="log-head">
+                <button
+                  className="log-fold"
+                  onClick={() => setProjectFlag(project.id, { logCollapsed: !project.logCollapsed })}
+                  aria-expanded={!project.logCollapsed}
+                  title={t(project.logCollapsed ? "Logbuch aufklappen" : "Logbuch einklappen")}
+                  aria-label={t(project.logCollapsed ? "Logbuch aufklappen" : "Logbuch einklappen")}
+                >
+                  <svg viewBox="0 0 16 16"><path d={project.logCollapsed ? "M6 4l4 4-4 4" : "M4 6l4 4 4-4"} /></svg>
+                </button>
+                <button className="log-date" onClick={() => openLog(project.id, isoToday())} title={t("Monatsansicht des Logbuchs")}>
+                  {t("Logbuch")} · {new Date().toLocaleDateString(locale(), { weekday: "short", day: "numeric", month: "short" })}
+                </button>
+                {logOpen.length > 0 && <span className="count">{logOpen.length}</span>}
+                <span className="spacer" />
+                {logDoneToday.length > 0 && <span className="log-done-n">{t("{n} heute erledigt", { n: logDoneToday.length })}</span>}
+                <button className="log-hide" onClick={() => setProjectFlag(project.id, { logHidden: true })} title={t("Logbuch in diesem Projekt ausblenden (wieder einblenden im Projekt-Dialog)")} aria-label={t("Logbuch ausblenden")}>
+                  <svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+                </button>
+              </div>
+              {!project.logCollapsed && (
+                <>
+                  <input
+                    className="new log-new"
+                    value={logInput}
+                    onChange={e => setLogInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && addLogTask()}
+                    placeholder={t("Für heute notieren…")}
+                  />
+                  {logParsed && (logParsed.due || logParsed.prio) && (
+                    <div className="hint">
+                      {logParsed.due && <span className="due">{formatDueLong(logParsed.due)}</span>}
+                      {logParsed.prio && (
+                        <span className="hint-prio">
+                          <i style={{ background: prioColor(logParsed.prio) }} />
+                          {t(PRIOS[logParsed.prio - 1].name)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {logOpen.length > 0 && renderList(logOpen)}
+                  {logDoneToday.length > 0 && (
+                    <ul className="log-done">
+                      {logDoneToday.map(x => (
+                        <li key={x.id}>
+                          <span className="log-mark">✓</span>
+                          <span className="log-text">{x.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {!logOpen.length && !logDoneToday.length && <p className="log-empty">{t("Noch nichts für heute. Alles, was zu keinem Thema passt, kommt hier rein.")}</p>}
+                </>
+              )}
+            </section>
+          )}
           <input
             className="new"
             value={input}
@@ -1763,47 +1941,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           {open.length === 0 ? (
             <p className="empty">{t("Nichts offen. Neue Aufgabe oben eintippen und Enter drücken. Datum geht direkt mit, z. B. „morgen“ oder „Freitag“.")}</p>
           ) : (
-            <ul className="list">
-              {open.map(task => {
-                const subs = subsOf(task.id);
-                const cls = ["task", leaving.includes(task.id) && "leaving", dragId === task.id && "dragging", task.due && daysUntil(task.due) < 0 && "late", flashId === task.id && "flash"].filter(Boolean).join(" ");
-                return (
-                  <li key={task.id} data-id={task.id} className={cls} onPointerDown={e => onRowPointerDown(e, task)}>
-                    {renderTask(task, false)}
-                    {(subs.length > 0 || subFor === task.id) && (
-                      <ul className="subs">
-                        {subs.map(s => (
-                          <li
-                            key={s.id}
-                            data-id={s.id}
-                            className={["sub", leaving.includes(s.id) && "leaving", dragId === s.id && "dragging", flashId === s.id && "flash"].filter(Boolean).join(" ")}
-                            onPointerDown={e => onRowPointerDown(e, s)}
-                          >
-                            {renderTask(s, true)}
-                          </li>
-                        ))}
-                        {subFor === task.id && (
-                          <li className="sub">
-                            <input
-                              className="sub-new"
-                              autoFocus
-                              value={subInput}
-                              onChange={e => setSubInput(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === "Enter") addSub(task);
-                                if (e.key === "Escape") setSubFor(null);
-                              }}
-                              onBlur={() => setSubFor(null)}
-                              placeholder={t("Unteraufgabe, Enter zum Hinzufügen")}
-                            />
-                          </li>
-                        )}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            renderList(open)
           )}
         </main>
       ) : (
@@ -1907,6 +2045,13 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
                 ))}
               </div>
             </div>
+            <label className="check-row">
+              <input type="checkbox" checked={dlgLog} onChange={e => setDlgLog(e.target.checked)} />
+              <span>
+                {t("Logbuch anzeigen")}
+                <small className="check-hint">{t("Fester Block oben für Aufgaben des Tages, die zu keinem Thema passen.")}</small>
+              </span>
+            </label>
             {settings.accessories && (
               <div className="field">
                 {t("Accessoire")}
@@ -1956,6 +2101,19 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
 
       {bubble && <span className="bubble in-bar" key={bubble.at}>{bubble.text}</span>}
       {lab && <PetLab kind={theme} onClose={() => setLab(false)} onGame={demo => openGame(demo)} />}
+      {sketchFor && data.tasks.some(x => x.id === sketchFor) && (
+        <SketchEditor
+          key={sketchFor}
+          title={data.tasks.find(x => x.id === sketchFor)!.text}
+          sketch={data.tasks.find(x => x.id === sketchFor)!.sketch}
+          onSave={sketch => patch(sketchFor, { sketch })}
+          onClose={closeSketch}
+          onDrag={() => {
+            forgetHome();
+            win.startDragging();
+          }}
+        />
+      )}
       {game && (
         <DamGame
           key={game.key}

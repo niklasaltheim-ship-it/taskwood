@@ -21,6 +21,7 @@ export type Settings = {
   autostartInit: boolean; // Autostart wurde beim ersten Start einmal eingeschaltet
   game: boolean; // Spiel "Dammbau" im Ordner-Menü
   gameSound: boolean; // Töne im Spiel
+  calLogs: boolean; // Logbuch-Punkte im Kalender
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autostartInit: false,
   game: true,
   gameSound: true,
+  calLogs: true,
 };
 
 export function loadSettings(): Settings {

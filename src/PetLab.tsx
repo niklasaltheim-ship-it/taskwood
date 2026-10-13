@@ -6,6 +6,10 @@ import { ANIMALS, animalName } from "./sprites";
 import type { AnimalKind } from "./sprites";
 import { t } from "./i18n";
 import type { DemoMode } from "./game/DamGame";
+import LogMonth from "./LogMonth";
+import type { Task } from "./data";
+import { iso } from "./dates";
+import { THEMES } from "./sprites";
 
 // Versteckte Testansicht (Strg+Shift+D): jede Stimmung und jedes Ereignis per Klick abspielen
 
@@ -37,6 +41,23 @@ const GAME: [DemoMode | null, string][] = [
   ["pause", "Pause"],
 ];
 
+// Beispiel-Logbuch der letzten Wochen (nur für die Vorschau, wird nicht gespeichert)
+function sampleLog(): Task[] {
+  const out: Task[] = [];
+  const now = new Date();
+  for (let back = 0; back < 45; back++) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
+    if (day.getDay() % 6 === 0 && back % 3) continue;
+    const n = (back * 7) % 5;
+    for (let i = 0; i < n; i++) {
+      const created = day.getTime() + (9 + i) * 3600000;
+      const done = (back + i) % 4 !== 0 && back > 0;
+      out.push({ id: `demo-${back}-${i}`, projectId: "demo", text: `${t("Beispiel")} ${back}.${i + 1}`, createdAt: created, order: back * 10 + i, log: iso(day), doneAt: done ? created + 3600000 * (1 + i) : undefined });
+    }
+  }
+  return out;
+}
+
 export default function PetLab({ kind: initial, onClose, onGame }: { kind: AnimalKind; onClose: () => void; onGame: (demo: DemoMode | null) => void }) {
   const [kind, setKind] = useState<AnimalKind>(initial);
   const [mood, setMood] = useState<MoodState>("relaxed");
@@ -46,6 +67,7 @@ export default function PetLab({ kind: initial, onClose, onGame }: { kind: Anima
   const [cuddle, setCuddle] = useState<boolean | undefined>(undefined);
   const [still, setStill] = useState(false);
   const [stash, setStash] = useState(3);
+  const [logPreview, setLogPreview] = useState(false);
 
   const fire = (type: string) => setEvent({ type, at: Date.now() });
   const toggle = (v: boolean | undefined) => (v ? undefined : true);
@@ -115,6 +137,11 @@ export default function PetLab({ kind: initial, onClose, onGame }: { kind: Anima
           <button key={label} className="chip small" onClick={() => onGame(d)}>{t(label)}</button>
         ))}
       </div>
+      <div className="lab-group">
+        <span>{t("Logbuch")}</span>
+        <button className={logPreview ? "chip small on" : "chip small"} onClick={() => setLogPreview(v => !v)}>{t("Logbuch-Monat (Beispieldaten)")}</button>
+      </div>
+      {logPreview && <LogMonth tasks={sampleLog()} projectId="demo" color={THEMES[kind].accent} />}
       <p className="lab-note">{t("Maus über das Tier bewegen: die Augen folgen. Stillhalten: es schmiegt sich an.")}</p>
     </div>
   );

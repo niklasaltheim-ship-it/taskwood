@@ -1736,3 +1736,509 @@ mark {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* ---------- Skizzenfeld ---------- */
+
+/* Knopf in der Aufgabenzeile: erscheint beim Drüberfahren, bleibt sichtbar, wenn es eine Skizze gibt */
+.sketch-btn {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.row:hover .sketch-btn,
+.sketch-btn:focus-visible,
+.sketch-btn.has {
+  opacity: 1;
+}
+.sketch-btn.has {
+  color: var(--accent);
+}
+.sketch-btn:hover {
+  color: var(--accent);
+  background: rgba(101, 109, 74, 0.12);
+}
+.sketch-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sketch-tag {
+  font-size: 12px;
+  color: var(--accent);
+}
+.sketch-tag::before {
+  content: "✎ ";
+}
+.sketch-tag:hover {
+  text-decoration: underline;
+}
+
+.sketch {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.sketch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  background: var(--head);
+  color: var(--head-text);
+  cursor: grab;
+}
+.sketch-bar > svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sketch-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sketch-done {
+  padding: 4px 12px;
+  border-color: color-mix(in srgb, var(--head-text) 40%, transparent);
+}
+.sketch-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.s-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--text);
+}
+.s-btn:hover:not(:disabled) {
+  background: rgba(101, 109, 74, 0.12);
+}
+.s-btn.on {
+  background: var(--accent);
+  color: #fff;
+}
+.s-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.s-btn.danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+.s-btn.danger.on {
+  background: var(--danger);
+}
+.s-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.s-dot {
+  display: block;
+  border-radius: 50%;
+  background: currentColor;
+}
+.s-color {
+  width: 20px;
+  height: 20px;
+  margin: 0 1px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.s-color.on {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.s-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--line);
+}
+.sketch-area {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.sketch-paper {
+  position: relative;
+  border-radius: 6px;
+  background-color: #fffdf6;
+  box-shadow: 0 1px 2px rgba(51, 61, 41, 0.15), 0 4px 14px rgba(51, 61, 41, 0.12);
+}
+.sketch-paper.bg-lines {
+  background-image: linear-gradient(to bottom, transparent calc(100% - 1px), #c9d6dd calc(100% - 1px));
+}
+.sketch-paper.bg-grid {
+  background-image: linear-gradient(to right, #e3e8e2 1px, transparent 1px), linear-gradient(to bottom, #e3e8e2 1px, transparent 1px);
+}
+.sketch-canvas {
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+.sketch-canvas.tool-eraser {
+  cursor: cell;
+}
+.sketch-canvas.tool-text {
+  cursor: text;
+}
+/* Textfelder über der Zeichnung */
+.sketch-texts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.s-text {
+  position: absolute;
+  pointer-events: auto;
+  min-height: 1.25em;
+  margin: -3px 0 0 -3px;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: move;
+  touch-action: none;
+}
+.sketch-texts.tool-eraser .s-text {
+  pointer-events: none;
+}
+.s-text:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  border-style: dashed;
+}
+.s-text.sel {
+  border: 1px dashed var(--accent);
+  background: rgba(255, 253, 246, 0.55);
+}
+.s-text.editing {
+  border-style: solid;
+  background: rgba(255, 253, 246, 0.9);
+  cursor: text;
+}
+.s-editor {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.s-editor::placeholder {
+  color: color-mix(in srgb, currentColor 45%, transparent);
+}
+.s-h {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  background: #fff;
+  touch-action: none;
+}
+.s-h.corner {
+  right: -8px;
+  bottom: -8px;
+  cursor: nwse-resize;
+}
+.s-h.side {
+  right: -8px;
+  top: 50%;
+  margin-top: -7px;
+  border-radius: 7px;
+  cursor: ew-resize;
+}
+.s-text.sel:has(.s-h.corner:hover) {
+  cursor: nwse-resize;
+}
+/* Kleine Leiste am ausgewählten Text */
+.s-textbar {
+  position: absolute;
+  left: -2px;
+  bottom: calc(100% + 6px);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 3px 10px rgba(51, 61, 41, 0.18);
+  font: 600 13px "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: default;
+}
+.s-textbar.below {
+  bottom: auto;
+  top: calc(100% + 14px);
+}
+.s-textbar button {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+.s-textbar button:hover {
+  background: rgba(101, 109, 74, 0.12);
+}
+.s-textbar button.del:hover {
+  color: var(--danger);
+}
+.s-textbar svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Logbuch ---------- */
+
+.logbook {
+  --log: var(--accent);
+  margin: 0 0 12px;
+  padding: 6px 8px 8px;
+  border: 1px solid color-mix(in srgb, var(--log) 30%, var(--line));
+  border-left: 4px solid var(--log);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--log) 6%, #fff);
+}
+.logbook.collapsed {
+  padding-bottom: 6px;
+}
+.log-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.log-fold,
+.log-hide {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+}
+.log-fold:hover,
+.log-hide:hover {
+  background: rgba(101, 109, 74, 0.12);
+  color: var(--text);
+}
+.log-hide {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.log-head:hover .log-hide,
+.log-hide:focus-visible {
+  opacity: 1;
+}
+.log-fold svg,
+.log-hide svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.log-date {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--log);
+}
+.log-date:hover {
+  text-decoration: underline;
+}
+.log-head .count {
+  background: var(--log);
+}
+.log-done-n {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.log-new {
+  margin-top: 6px;
+  background: #fff;
+}
+.logbook .list {
+  margin-top: 4px;
+}
+.log-done {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 4px;
+}
+.log-done li {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.log-done .log-text {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.log-mark {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--log, var(--accent));
+}
+.log-empty {
+  margin: 6px 4px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.log-since {
+  padding: 0 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-size: 11.5px;
+  color: var(--strong);
+}
+
+/* Monatsansicht */
+.log-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--strong);
+}
+.log-month {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.log-dot {
+  display: block;
+  border-radius: 50%;
+  background: var(--log);
+}
+.log-sub {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 7px;
+  text-align: left;
+}
+.log-entry:not(:disabled):hover {
+  background: rgba(101, 109, 74, 0.1);
+}
+.log-entry.done .log-text {
+  color: var(--muted);
+}
+.log-entry .log-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+.log-when {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hauptkalender: Logbuch-Punkte (kleine Quadrate, damit sie sich von Aufgaben-Punkten abheben) */
+.cal-logs {
+  display: flex;
+  gap: 2px;
+  min-height: 6px;
+}
+.dot-log {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.dot-log:hover {
+  transform: scale(1.4);
+}
+.dot-log.sample {
+  display: inline-block;
+  background: var(--accent);
+  cursor: default;
+}
+.cal-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -2px 0 2px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cal-filter input {
+  accent-color: var(--accent);
+}

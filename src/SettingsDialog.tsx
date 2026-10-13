@@ -130,7 +130,7 @@ export default function SettingsDialog(p: Props) {
         {page === "about" && (
           <>
             <h2>{APP_NAME}</h2>
-            <p className="about-line">{t("Version {v}", { v: version || "1.2.0" })} · © 2026 {PUBLISHER}</p>
+            <p className="about-line">{t("Version {v}", { v: version || "1.3.0" })} · © 2026 {PUBLISHER}</p>
             <p className="about-line">{t("Lizenz: MIT")}</p>
             <div className="settings-row">
               <button className="btn" onClick={() => setPage("license")}>{t("Lizenztext")}</button>
