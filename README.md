@@ -21,6 +21,8 @@ a lot is due, and jumps for joy when you tick something off.
 - **Tasks** with subtasks, notes, priorities and drag-and-drop sorting
 - **Dates right in the text:** “tomorrow”, “Friday”, “in 3 days”, “by Oct 12” (also German)
 - **Recurring tasks:** “every Monday”, “daily”, “monthly”
+- **Paste a Markdown list** (“# Project”, “- [ ] Task”, indented subtasks) or drop a .md/.txt file,
+  with a preview, project mapping and no duplicates
 - **Timer per project** with a notification, keeps running when collapsed
 - **Calendar** with events, reminders and an exam countdown
 - **Class timetable** with day and week view

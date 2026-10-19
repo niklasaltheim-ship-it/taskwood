@@ -2247,3 +2247,156 @@ mark {
 .cal-filter input {
   accent-color: var(--accent);
 }
+
+/* ---------- Liste einfügen ---------- */
+.imp {
+  gap: 10px;
+}
+.imp-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.imp-input {
+  min-height: 170px;
+  resize: vertical;
+  padding: 8px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: 12.5px/1.45 Consolas, "Cascadia Mono", monospace;
+  color: var(--text);
+}
+.imp-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.imp-file {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.imp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.imp-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.imp-from {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--strong);
+}
+.imp-arrow {
+  color: var(--muted);
+}
+.imp-head select {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 60%;
+}
+.imp-group.off .imp-from {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.imp-list {
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+}
+.imp-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.imp-item.sub {
+  padding-left: 18px;
+  font-size: 12.5px;
+}
+.imp-item .due,
+.imp-item .repeat {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.imp-item .due {
+  color: var(--muted);
+}
+.imp-mark {
+  width: 12px;
+  flex: none;
+  color: var(--muted);
+}
+.imp-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.imp-item.done .imp-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.imp-item.done .imp-mark {
+  color: var(--accent);
+}
+.imp-prio {
+  font-weight: 700;
+  color: var(--danger);
+}
+.imp-item.dup {
+  opacity: 0.5;
+}
+.imp-tag {
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--soft) 45%, transparent);
+  color: var(--strong);
+}
+.imp-dups {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  background: color-mix(in srgb, var(--soft) 30%, transparent);
+}
+.imp-dups strong {
+  color: var(--strong);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Datei wird über das Fenster gezogen */
+.drop-hint {
+  position: absolute;
+  inset: 8px;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--strong);
+  pointer-events: none;
+}

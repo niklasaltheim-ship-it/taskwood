@@ -500,4 +500,38 @@ const EN: Record<string, string> = {
   "Einzelne Clips": "Single clips",
   "Maus über das Tier bewegen: die Augen folgen. Stillhalten: es schmiegt sich an.":
     "Move the mouse over the animal: its eyes follow. Hold still: it cuddles up.",
+
+  // ---------- Liste einfügen ----------
+  "Liste einfügen…": "Paste list…",
+  "Liste einfügen": "Paste list",
+  "Füge eine Aufgabenliste ein (Strg+V). „# Name“ wird zum Projekt, „- [ ] Text“ zur Aufgabe, eingerückt zur Unteraufgabe, „- [x]“ gilt als erledigt.":
+    "Paste a task list (Ctrl+V). “# Name” becomes a project, “- [ ] Text” a task, indented lines subtasks, “- [x]” counts as done.",
+  "# Einkauf\n- [ ] Milch morgen\n- [ ] Brot !\n\n# Mathe\n- [ ] Blatt 3 bis Freitag !!\n  - [ ] Aufgabe 1\n  - [x] Aufgabe 2":
+    "# Groceries\n- [ ] Milk tomorrow\n- [ ] Bread !\n\n# Math\n- [ ] Sheet 3 by Friday !!\n  - [ ] Exercise 1\n  - [x] Exercise 2",
+  "In diesem Text wurden keine Aufgaben gefunden.": "No tasks found in this text.",
+  "Ohne Überschrift": "No heading",
+  "Importierte Liste": "Imported list",
+  "Ziel für {name}": "Destination for {name}",
+  "Neues Projekt „{name}“": "New project “{name}”",
+  "Als neues Projekt": "As new project",
+  "Nicht übernehmen": "Don't import",
+  "schon da": "exists",
+  "1 Aufgabe gibt es schon.": "1 task already exists.",
+  "{n} Aufgaben gibt es schon.": "{n} tasks already exist.",
+  "Überspringen, nur Neues übernehmen": "Skip them, import only new ones",
+  "Trotzdem noch einmal anlegen": "Add them again anyway",
+  "1 Textzeile ohne Aufgabe wird übersprungen.": "1 line without a task will be skipped.",
+  "{n} Textzeilen ohne Aufgabe werden übersprungen.": "{n} lines without a task will be skipped.",
+  "Text ändern": "Edit text",
+  Vorschau: "Preview",
+  "Nichts Neues": "Nothing new",
+  "1 Aufgabe übernehmen": "Import 1 task",
+  "{n} Aufgaben übernehmen": "Import {n} tasks",
+  "Legt 1 neues Projekt an": "Creates 1 new project",
+  "Legt {n} neue Projekte an": "Creates {n} new projects",
+  "1 Aufgabe übernommen!": "1 task added!",
+  "{n} Aufgaben übernommen!": "{n} tasks added!",
+  "Liste hier ablegen": "Drop list here",
+  "Nur .md- oder .txt-Dateien, bitte.": "Only .md or .txt files, please.",
+  "Die Datei konnte ich nicht lesen.": "I couldn't read that file.",
 };

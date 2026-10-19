@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Window, getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen, emitTo } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -40,6 +41,9 @@ import { addScore } from "./game/scores";
 import SketchEditor from "./SketchEditor";
 import LogMonth from "./LogMonth";
 import { LOG_COLOR, dayOf, logDots, sinceLabel } from "./logbook";
+import ListImport from "./ListImport";
+import { applyPlan, looksLikeList, parseList } from "./markdownList";
+import type { PlanGroup } from "./markdownList";
 import "./App.css";
 import "./extras.css";
 
@@ -127,6 +131,8 @@ const GEAR_D = "M8 5.8a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4M8 1.8v1.7M8 12.5v
 const MENU_D = "M3 4.5h10M3 8h10M3 11.5h10";
 const BIG_D = "M9.5 6.5l4-4M10 2.5h3.5V6M6.5 9.5l-4 4M6 13.5H2.5V10";
 const SMALL_D = "M13.5 2.5L9.5 6.5M9.5 3v3.5H13M2.5 13.5l4-4M6.5 13V9.5H3";
+const PASTE_D = "M5.5 3H3.5v11h9V3h-2M5.5 2h5v2.5h-5zM5.5 7.5h5M5.5 10h5M5.5 12h3";
+const isListFile = (path: string) => /\.(md|markdown|txt)$/i.test(path);
 
 export default function App() {
   const [data, setData] = useState<Data>(load);
@@ -179,6 +185,8 @@ export default function App() {
   const [sketchFor, setSketchFor] = useState<string | null>(null); // Aufgabe, deren Skizzenfeld offen ist
   const [logInput, setLogInput] = useState("");
   const [logFocus, setLogFocus] = useState<string | null>(null); // Tag in der Logbuch-Monatsansicht
+  const [listImport, setListImport] = useState<{ text: string; file?: string; at: number } | null>(null); // Liste einfügen
+  const [dropping, setDropping] = useState(false); // Datei wird über das Fenster gezogen
   const visitSideRef = useRef<"left" | "right" | null>(null);
   const winChain = useRef<Promise<unknown>>(Promise.resolve());
   const lastBubble = useRef(0);
@@ -470,6 +478,7 @@ export default function App() {
   const collapse = async () => {
     setMenu(null);
     setDialog(null);
+    setListImport(null);
     setVisitor(null);
     if (!reducedMotion()) {
       setClosing(true);
@@ -1019,6 +1028,77 @@ export default function App() {
     }
   };
 
+  // ---------- Liste einfügen (Markdown-Aufgabenliste aus der Zwischenablage oder als Datei) ----------
+
+  const openListImport = async (text: string, file?: string) => {
+    setMenu(null);
+    if (collapsedRef.current) await expand();
+    setListImport({ text, file, at: Date.now() });
+  };
+  const openListImportRef = useRef(openListImport);
+  openListImportRef.current = openListImport;
+
+  // Aus dem Menü: Zwischenablage direkt lesen; klappt das nicht, erscheint ein Feld zum Einfügen
+  const pasteList = async () => {
+    let text = "";
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {}
+    openListImport(parseList(text).count ? text : "");
+  };
+
+  const applyListImport = (pl: PlanGroup[], skipDups: boolean) => {
+    const r = applyPlan(dataRef.current, pl, skipDups);
+    setData(r.data);
+    setListImport(null);
+    // Nichts ins aktuelle Projekt: zum ersten Zielprojekt wechseln
+    const intoCurrent = pl.some(g => g.target.kind === "project" && g.target.id === project?.id);
+    const first = r.data.projects.find(p => p.id === r.firstProject);
+    if (first && !intoCurrent) selectProject(first);
+    setView("list");
+    petDo("added");
+    say(t(r.added === 1 ? "1 Aufgabe übernommen!" : "{n} Aufgaben übernommen!", { n: r.added }), true);
+  };
+
+  // Strg+V außerhalb von Eingabefeldern: sieht der Text nach einer Liste aus, gleich die Vorschau zeigen
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable]")) return;
+      if (listImport || dialog || settingsOpen || game || sketchFor || lab) return;
+      const text = e.clipboardData?.getData("text") ?? "";
+      if (!looksLikeList(text)) return;
+      e.preventDefault();
+      openListImport(text);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  });
+
+  // .md- oder .txt-Datei aufs Fenster ziehen
+  useEffect(() => {
+    const off = getCurrentWebview().onDragDropEvent(async ({ payload }) => {
+      if (payload.type === "enter") setDropping(payload.paths.some(isListFile));
+      else if (payload.type === "leave") setDropping(false);
+      else if (payload.type === "drop") {
+        setDropping(false);
+        const paths = payload.paths.filter(isListFile);
+        if (!paths.length) {
+          if (payload.paths.length) sayRef.current(t("Nur .md- oder .txt-Dateien, bitte."), true);
+          return;
+        }
+        try {
+          const texts = await Promise.all(paths.map(path => invoke<string>("read_list", { path })));
+          openListImportRef.current(texts.join("\n\n"), paths.map(p => p.split(/[\\/]/).pop()).join(", "));
+        } catch {
+          sayRef.current(t("Die Datei konnte ich nicht lesen."), true);
+        }
+      }
+    });
+    return () => {
+      off.then(f => f());
+    };
+  }, []);
+
   // ---------- Besuch von Tieren anderer Projekte ----------
 
   const canVisit = settings.visits && data.projects.length > 1 && !game;
@@ -1554,6 +1634,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           })}
           {project && menuItem(HIST_D, t("Verlauf"), view === "history", () => setView("history"))}
           {settings.timer && project && menuItem(TIMER_D, t("Timer"), timerOpen, () => setTimerOpen(o => !o), timer ? <span className="m-sub">{clock(left)}</span> : null)}
+          {menuItem(PASTE_D, t("Liste einfügen…"), false, pasteList)}
           <div className="m-sep" />
           {menuItem(settings.large ? SMALL_D : BIG_D, t(settings.large ? "Fenster verkleinern" : "Fenster vergrößern"), false, () => setSettings(st => ({ ...st, large: !st.large })))}
           {menuItem(GEAR_D, t("Einstellungen…"), false, () => setSettingsOpen(true))}
@@ -2139,6 +2220,11 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           }}
         />
       )}
+
+      {listImport && (
+        <ListImport key={listImport.at} data={data} text={listImport.text} file={listImport.file} onApply={applyListImport} onClose={() => setListImport(null)} />
+      )}
+      {dropping && !collapsed && <div className="drop-hint">{t("Liste hier ablegen")}</div>}
 
       <canvas ref={confettiRef} className="confetti" aria-hidden />
     </div>

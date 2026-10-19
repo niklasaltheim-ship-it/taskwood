@@ -32,6 +32,21 @@ fn read_ics(path: String) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
+// Listen-Import per Drag & Drop: nur .md- und .txt-Dateien, höchstens 1 MB
+#[tauri::command]
+fn read_list(path: String) -> Result<String, String> {
+    let p = Path::new(&path);
+    match p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()) {
+        Some(e) if e == "md" || e == "markdown" || e == "txt" => {}
+        _ => return Err("Nur .md- und .txt-Dateien sind erlaubt".to_string()),
+    }
+    let bytes = std::fs::read(p).map_err(|e| e.to_string())?;
+    if bytes.len() > 1_000_000 {
+        return Err("Datei zu groß".to_string());
+    }
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
 // Startparameter für Sicherung ohne Klicks: --export <datei> bzw. --import <datei>
 #[tauri::command]
 fn cli_task() -> Option<(String, String)> {
@@ -79,7 +94,14 @@ pub fn run() {
             WindowEvent::Destroyed if window.label() == "main" => window.app_handle().exit(0),
             _ => {}
         })
-        .invoke_handler(tauri::generate_handler![write_text, read_text, read_ics, set_bounds, cli_task, third_party_licenses, quit])
+        // Hauptfenster hier anlegen statt aus der Konfiguration: nur so darf die Seite die
+        // Zwischenablage lesen ("Liste einfügen"), ohne dass WebView2 jedes Mal nachfragt
+        .setup(|app| {
+            let config = app.config().app.windows.iter().find(|w| w.label == "main").cloned().expect("Fenster main fehlt in tauri.conf.json");
+            tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?.enable_clipboard_access().build()?;
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![write_text, read_text, read_ics, read_list, set_bounds, cli_task, third_party_licenses, quit])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
