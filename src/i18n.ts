@@ -455,6 +455,8 @@ const EN: Record<string, string> = {
   "{n} heute erledigt": "{n} done today",
   "Logbuch in diesem Projekt ausblenden (wieder einblenden im Projekt-Dialog)": "Hide the daily log in this project (show it again in the project dialog)",
   "Logbuch ausblenden": "Hide daily log",
+  "Logbuch ausblenden (wieder einblenden in den Einstellungen)": "Hide the daily log (show it again in Settings)",
+  "Gemeinsamer Block oben in jedem Projekt für Aufgaben des Tages, die zu keinem Thema passen.": "A shared block at the top of every project for the day's tasks that don't fit a topic.",
   "Für heute notieren…": "Note for today…",
   "Noch nichts für heute. Alles, was zu keinem Thema passt, kommt hier rein.": "Nothing for today yet. Anything that doesn't fit a topic goes here.",
   "Kommt ins Logbuch!": "Into the log it goes!",

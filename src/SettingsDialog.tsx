@@ -88,6 +88,7 @@ export default function SettingsDialog(p: Props) {
               )}
               {toggle("quickAdd", t("Schnelleingabe mit {key}", { key: t(QUICK_LABEL) }), t("Aus jedem Programm: Aufgabe tippen, Enter, fertig."))}
               {s.quickAdd && p.shortcutFailed && <p className="field-error">{t("Das Tastenkürzel ist schon von einem anderen Programm belegt.")}</p>}
+              {toggle("logbook", t("Logbuch"), t("Gemeinsamer Block oben in jedem Projekt für Aufgaben des Tages, die zu keinem Thema passen."))}
               {toggle("today", t("Heute-Ansicht"), t("Alles Fällige aus allen Projekten auf einen Blick."))}
               {toggle("search", t("Suche über alle Projekte"))}
               {toggle("timer", t("Timer"))}
@@ -130,7 +131,7 @@ export default function SettingsDialog(p: Props) {
         {page === "about" && (
           <>
             <h2>{APP_NAME}</h2>
-            <p className="about-line">{t("Version {v}", { v: version || "1.3.0" })} · © 2026 {PUBLISHER}</p>
+            <p className="about-line">{t("Version {v}", { v: version || "1.3.1" })} · © 2026 {PUBLISHER}</p>
             <p className="about-line">{t("Lizenz: MIT")}</p>
             <div className="settings-row">
               <button className="btn" onClick={() => setPage("license")}>{t("Lizenztext")}</button>

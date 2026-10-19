@@ -22,6 +22,8 @@ export type Settings = {
   game: boolean; // Spiel "Dammbau" im Ordner-Menü
   gameSound: boolean; // Töne im Spiel
   calLogs: boolean; // Logbuch-Punkte im Kalender
+  logbook: boolean; // gemeinsames Logbuch oben in jedem Projekt
+  logCollapsed: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,6 +43,8 @@ export const DEFAULT_SETTINGS: Settings = {
   game: true,
   gameSound: true,
   calLogs: true,
+  logbook: true,
+  logCollapsed: false,
 };
 
 export function loadSettings(): Settings {

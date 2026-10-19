@@ -6,7 +6,6 @@ import { countdown, eventsOn, REMIND_OPTIONS } from "./events";
 import { hhmm, hm, lecturesOn, toMin } from "./schedule";
 import type { Lecture } from "./schedule";
 import { lang, locale, t } from "./i18n";
-import type { LogDot } from "./logbook";
 
 type Props = {
   events: CalEvent[];
@@ -18,10 +17,10 @@ type Props = {
   onOpenTask: (task: Task) => void;
   onImport?: () => void; // Kalender-Import (.ics), falls eingeschaltet
   importMsg?: string | null;
-  logDots: Record<string, LogDot[]>; // Logbücher je Tag
+  logDots: Record<string, number>; // Logbuch-Einträge je Tag
   showLogs: boolean;
   onShowLogs: (on: boolean) => void;
-  onOpenLog: (projectId: string, date: string) => void;
+  onOpenLog: (date: string) => void;
 };
 
 type Draft = {
@@ -98,20 +97,16 @@ export default function Calendar({ events, onEvents, tasks, projects, lectures, 
           {dayEvents.filter(e => !e.exam).slice(0, 2).map(e => <i key={e.id} className="dot dot-ev" />)}
           {dayTasks.slice(0, 3).map(t => <i key={t.id} className={late ? "dot dot-late" : "dot dot-task"} />)}
         </span>
-        {showLogs && logDots[date] && (
+        {showLogs && logDots[date] > 0 && (
           <span className="cal-logs">
-            {logDots[date].slice(0, 4).map(l => (
-              <i
-                key={l.projectId}
-                className="dot-log"
-                style={{ background: l.color }}
-                title={t("Logbuch · {name}", { name: l.name }) + ` (${l.count})`}
-                onClick={e => {
-                  e.stopPropagation();
-                  onOpenLog(l.projectId, date);
-                }}
-              />
-            ))}
+            <i
+              className="dot-log"
+              title={t("Logbuch") + ` (${logDots[date]})`}
+              onClick={e => {
+                e.stopPropagation();
+                onOpenLog(date);
+              }}
+            />
           </span>
         )}
       </button>
@@ -184,8 +179,8 @@ export default function Calendar({ events, onEvents, tasks, projects, lectures, 
   const dayLectures = weekday >= 1 && weekday <= 5 ? lecturesOn(lectures, weekday) : [];
   const selLabel = sel.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
   const week = lang() === "de" ? ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const dayLogs = showLogs ? logDots[selected] ?? [] : [];
-  const empty = !dayEvents.length && !dayTasks.length && !dayLectures.length && !dayLogs.length;
+  const dayLog = showLogs ? logDots[selected] ?? 0 : 0;
+  const empty = !dayEvents.length && !dayTasks.length && !dayLectures.length && !dayLog;
 
   return (
     <main className="body calendar">
@@ -251,13 +246,12 @@ export default function Calendar({ events, onEvents, tasks, projects, lectures, 
             </span>
           </button>
         ))}
-        {dayLogs.map(l => (
-          <button key={l.projectId} className="cal-item cal-logitem" style={{ "--lec": l.color } as CSSProperties} onClick={() => onOpenLog(l.projectId, selected)} title={t("Logbuch öffnen")}>
+        {dayLog > 0 && (
+          <button className="cal-item cal-logitem" style={{ "--lec": "#3E6A8A" } as CSSProperties} onClick={() => onOpenLog(selected)} title={t("Logbuch öffnen")}>
             <span className="cal-time">{t("Logbuch")}</span>
-            <span className="cal-title">{l.name}</span>
-            <span className="cal-sub">{t(l.count === 1 ? "1 Eintrag" : "{n} Einträge", { n: l.count })}</span>
+            <span className="cal-title">{t(dayLog === 1 ? "1 Eintrag" : "{n} Einträge", { n: dayLog })}</span>
           </button>
-        ))}
+        )}
         {dayLectures.map(l => (
           <div key={l.id} className="cal-item lecture" style={{ "--lec": l.color } as CSSProperties}>
             <span className="cal-time">{hm(l.start)}–{hm(l.end)}</span>

@@ -39,7 +39,7 @@ import type { DemoMode } from "./game/DamGame";
 import { addScore } from "./game/scores";
 import SketchEditor from "./SketchEditor";
 import LogMonth from "./LogMonth";
-import { dayOf, logDots, projectColor, sinceLabel } from "./logbook";
+import { LOG_COLOR, dayOf, logDots, sinceLabel } from "./logbook";
 import "./App.css";
 import "./extras.css";
 
@@ -174,12 +174,11 @@ export default function App() {
   const [visitor, setVisitor] = useState<{ id: string; at: number; leaving?: boolean } | null>(null);
   const [guestEvent, setGuestEvent] = useState<PetEvent | null>(null);
   const [guestBubble, setGuestBubble] = useState<{ text: string; at: number } | null>(null);
-  const [visitSide, setVisitSide] = useState<"left" | "right" | null>(null);
+  const [visitSide, setVisitSide] = useState<"left" | "right" | null>(null); // eingeklappt: Fenster für den Gast verbreitert
   const [game, setGame] = useState<{ demo: DemoMode | null; key: number } | null>(null);
   const [sketchFor, setSketchFor] = useState<string | null>(null); // Aufgabe, deren Skizzenfeld offen ist
   const [logInput, setLogInput] = useState("");
   const [logFocus, setLogFocus] = useState<string | null>(null); // Tag in der Logbuch-Monatsansicht
-  const [dlgLog, setDlgLog] = useState(true); // eingeklappt: Fenster für den Gast verbreitert
   const visitSideRef = useRef<"left" | "right" | null>(null);
   const winChain = useRef<Promise<unknown>>(Promise.resolve());
   const lastBubble = useRef(0);
@@ -284,8 +283,9 @@ export default function App() {
   const count = allOpen.length; // Logbuch zählt mit (Zähler, Stimmung)
   const open = allOpen.filter(t => !t.log);
   // Logbuch: alle offenen Logbuch-Aufgaben (auch von früheren Tagen) plus heute erledigte
-  const logOpen = allOpen.filter(t => t.log);
-  const logDoneToday = project ? data.tasks.filter(t => t.projectId === project.id && t.log && !t.parentId && t.doneAt && dayOf(t.doneAt) === isoToday()) : [];
+  // Ein gemeinsames Logbuch für alle Projekte: überall dieselben Einträge
+  const logOpen = data.tasks.filter(t => t.log && !t.parentId && !t.doneAt).sort(byOrder);
+  const logDoneToday = data.tasks.filter(t => t.log && !t.parentId && t.doneAt && dayOf(t.doneAt) === isoToday()).sort((a, b) => a.doneAt! - b.doneAt!);
   const theme: AnimalKind = project?.animal ?? "beaver";
 
   // Vorrat: erledigte Aufgaben der letzten Tage
@@ -572,11 +572,7 @@ export default function App() {
     petDo("added");
     if (Math.random() < 0.5) say(t(pick(["Notiert!", "Kommt ins Logbuch!", "Machen wir!"])), REACT_GAP);
   };
-  const setProjectFlag = (id: string, patch: Partial<Project>) =>
-    setData(d => ({ ...d, projects: d.projects.map(p => (p.id === id ? { ...p, ...patch } : p)) }));
-  const openLog = (projectId: string, date: string | null) => {
-    const p = data.projects.find(pp => pp.id === projectId);
-    if (p) selectProject(p);
+  const openLog = (date: string | null) => {
     setLogFocus(date ?? isoToday());
     setView("log");
   };
@@ -686,7 +682,11 @@ export default function App() {
   const moveTo = (task: Task, index: number) =>
     setData(d => {
       const sibs = d.tasks
-        .filter(t => t.projectId === task.projectId && t.parentId === task.parentId && !t.doneAt && t.id !== task.id && (!!task.parentId || !t.log === !task.log))
+        .filter(t =>
+          !task.parentId && task.log
+            ? t.log && !t.parentId && !t.doneAt && t.id !== task.id // Logbuch: projektübergreifend
+            : t.projectId === task.projectId && t.parentId === task.parentId && !t.doneAt && t.id !== task.id && (!!task.parentId || !t.log)
+        )
         .sort(byOrder);
       sibs.splice(index, 0, task);
       const orders = sibs.map(t => d.tasks.find(x => x.id === t.id)!.order).sort((a, b) => a - b);
@@ -797,7 +797,6 @@ export default function App() {
     setDlgName("");
     setDlgAnimal("beaver");
     setDlgWear(undefined);
-    setDlgLog(true);
     setConfirmDel(false);
     setMenu(null);
   };
@@ -808,7 +807,6 @@ export default function App() {
     setDlgAnimal(p.animal);
     setDlgFolder(p.folderId);
     setDlgWear(p.wear);
-    setDlgLog(!p.logHidden);
     setConfirmDel(false);
     setMenu(null);
   };
@@ -817,7 +815,7 @@ export default function App() {
     if (!dialog) return;
     const name = dlgName.trim();
     if (dialog.mode === "new") {
-      const p: Project = { id: uid(), folderId: folder.id, name: name || t("Neues Projekt"), animal: dlgAnimal, wear: dlgWear, logHidden: !dlgLog || undefined };
+      const p: Project = { id: uid(), folderId: folder.id, name: name || t("Neues Projekt"), animal: dlgAnimal, wear: dlgWear };
       setData(d => ({
         ...d,
         projects: [...d.projects, p],
@@ -828,7 +826,7 @@ export default function App() {
       const id = dialog.id;
       setData(d => {
         const projects = d.projects.map(p =>
-          p.id === id ? { ...p, name: name || p.name, animal: dlgAnimal, folderId: dlgFolder || p.folderId, wear: dlgWear, logHidden: !dlgLog || undefined } : p
+          p.id === id ? { ...p, name: name || p.name, animal: dlgAnimal, folderId: dlgFolder || p.folderId, wear: dlgWear } : p
         );
         // Projekt in anderen Ordner verschoben: dorthin mitgehen
         const moved = projects.find(p => p.id === id)!;
@@ -1152,7 +1150,7 @@ export default function App() {
     if (p) selectProject(p);
     // Aufgabe im (eingeklappten) Logbuch: aufklappen, damit man sie sieht
     const root = task.parentId ? data.tasks.find(x => x.id === task.parentId) : task;
-    if (p && root?.log && !task.doneAt && (p.logCollapsed || p.logHidden)) setProjectFlag(p.id, { logCollapsed: false, logHidden: false });
+    if (root?.log && !task.doneAt && (settings.logCollapsed || !settings.logbook)) setSettings(st => ({ ...st, logCollapsed: false, logbook: true }));
     setView(task.doneAt ? "history" : "list");
     if (!task.doneAt) setFlashId(task.id);
   };
@@ -1801,7 +1799,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           onOpenTask={goToTask}
           onImport={settings.icsImport ? importIcs : undefined}
           importMsg={settings.icsImport ? icsMsg : null}
-          logDots={logDots(data.tasks, data.projects)}
+          logDots={logDots(data.tasks)}
           showLogs={settings.calLogs}
           onShowLogs={on => setSettings(st => ({ ...st, calLogs: on }))}
           onOpenLog={openLog}
@@ -1847,13 +1845,9 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
             setView("plan");
           }}
         />
-      ) : view === "log" && project ? (
+      ) : view === "log" ? (
         <main className="body">
-          <div className="log-title">
-            <Pet kind={project.animal} mood="relaxed" still crop="head" wear={wearFor(project)} />
-            <strong>{t("Logbuch · {name}", { name: project.name })}</strong>
-          </div>
-          <LogMonth tasks={data.tasks} projectId={project.id} color={projectColor(project)} focus={logFocus} onOpenTask={goToTask} />
+          <LogMonth tasks={data.tasks} color={LOG_COLOR} focus={logFocus} onOpenTask={goToTask} projectName={id => data.projects.find(p => p.id === id)?.name} />
         </main>
       ) : !project ? (
         <main className="body">
@@ -1862,29 +1856,29 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
         </main>
       ) : view === "list" ? (
         <main className="body">
-          {!project.logHidden && (
-            <section className={project.logCollapsed ? "logbook collapsed" : "logbook"} style={{ "--log": projectColor(project) } as CSSProperties}>
+          {settings.logbook && (
+            <section className={settings.logCollapsed ? "logbook collapsed" : "logbook"} style={{ "--log": LOG_COLOR } as CSSProperties}>
               <div className="log-head">
                 <button
                   className="log-fold"
-                  onClick={() => setProjectFlag(project.id, { logCollapsed: !project.logCollapsed })}
-                  aria-expanded={!project.logCollapsed}
-                  title={t(project.logCollapsed ? "Logbuch aufklappen" : "Logbuch einklappen")}
-                  aria-label={t(project.logCollapsed ? "Logbuch aufklappen" : "Logbuch einklappen")}
+                  onClick={() => setSettings(st => ({ ...st, logCollapsed: !st.logCollapsed }))}
+                  aria-expanded={!settings.logCollapsed}
+                  title={t(settings.logCollapsed ? "Logbuch aufklappen" : "Logbuch einklappen")}
+                  aria-label={t(settings.logCollapsed ? "Logbuch aufklappen" : "Logbuch einklappen")}
                 >
-                  <svg viewBox="0 0 16 16"><path d={project.logCollapsed ? "M6 4l4 4-4 4" : "M4 6l4 4 4-4"} /></svg>
+                  <svg viewBox="0 0 16 16"><path d={settings.logCollapsed ? "M6 4l4 4-4 4" : "M4 6l4 4 4-4"} /></svg>
                 </button>
-                <button className="log-date" onClick={() => openLog(project.id, isoToday())} title={t("Monatsansicht des Logbuchs")}>
+                <button className="log-date" onClick={() => openLog(isoToday())} title={t("Monatsansicht des Logbuchs")}>
                   {t("Logbuch")} · {new Date().toLocaleDateString(locale(), { weekday: "short", day: "numeric", month: "short" })}
                 </button>
                 {logOpen.length > 0 && <span className="count">{logOpen.length}</span>}
                 <span className="spacer" />
                 {logDoneToday.length > 0 && <span className="log-done-n">{t("{n} heute erledigt", { n: logDoneToday.length })}</span>}
-                <button className="log-hide" onClick={() => setProjectFlag(project.id, { logHidden: true })} title={t("Logbuch in diesem Projekt ausblenden (wieder einblenden im Projekt-Dialog)")} aria-label={t("Logbuch ausblenden")}>
+                <button className="log-hide" onClick={() => setSettings(st => ({ ...st, logbook: false }))} title={t("Logbuch ausblenden (wieder einblenden in den Einstellungen)")} aria-label={t("Logbuch ausblenden")}>
                   <svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
                 </button>
               </div>
-              {!project.logCollapsed && (
+              {!settings.logCollapsed && (
                 <>
                   <input
                     className="new log-new"
@@ -2045,13 +2039,6 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
                 ))}
               </div>
             </div>
-            <label className="check-row">
-              <input type="checkbox" checked={dlgLog} onChange={e => setDlgLog(e.target.checked)} />
-              <span>
-                {t("Logbuch anzeigen")}
-                <small className="check-hint">{t("Fester Block oben für Aufgaben des Tages, die zu keinem Thema passen.")}</small>
-              </span>
-            </label>
             {settings.accessories && (
               <div className="field">
                 {t("Accessoire")}

@@ -8,8 +8,9 @@ import { lang, locale, t } from "./i18n";
 // Monatsansicht eines Logbuchs: Punkt je Tag (Größe nach Anzahl), darunter die Aufgaben des gewählten Tages
 
 type Props = {
-  tasks: Task[]; // alle Aufgaben; gefiltert wird nach projectId
-  projectId: string;
+  tasks: Task[]; // alle Aufgaben
+  projectId?: string; // nur dieses Projekt (sonst das gemeinsame Logbuch)
+  projectName?: (id: string) => string | undefined; // Projekt klein am Eintrag anzeigen
   color: string;
   focus?: string | null; // Tag, der beim Öffnen gewählt sein soll
   onOpenTask?: (task: Task) => void;
@@ -21,7 +22,7 @@ const fromIso = (s: string) => {
 };
 const time = (ts: number) => new Date(ts).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
 
-export default function LogMonth({ tasks, projectId, color, focus, onOpenTask }: Props) {
+export default function LogMonth({ tasks, projectId, projectName, color, focus, onOpenTask }: Props) {
   const todayIso = iso(new Date());
   const [selected, setSelected] = useState(focus ?? todayIso);
   const [month, setMonth] = useState(() => {
@@ -56,7 +57,10 @@ export default function LogMonth({ tasks, projectId, color, focus, onOpenTask }:
   const row = (task: Task, kind: "created" | "done") => (
     <button key={kind + task.id} className={task.doneAt ? "log-entry done" : "log-entry"} onClick={() => onOpenTask?.(task)} disabled={!onOpenTask}>
       <span className="log-mark">{task.doneAt ? "✓" : "○"}</span>
-      <span className="log-text">{task.text}</span>
+      <span className="log-text">
+        {task.text}
+        {projectName?.(task.projectId) && <small className="log-project">{projectName(task.projectId)}</small>}
+      </span>
       <span className="log-when">
         {kind === "done" ? time(task.doneAt!) : task.doneAt ? t("erledigt {date}", { date: fromIso(iso(new Date(task.doneAt))).toLocaleDateString(locale(), { day: "numeric", month: "short" }) }) : t("offen")}
       </span>
@@ -65,6 +69,7 @@ export default function LogMonth({ tasks, projectId, color, focus, onOpenTask }:
 
   return (
     <div className="log-month" style={{ "--log": color } as CSSProperties}>
+      {!projectId && <strong className="log-title">{t("Logbuch")}</strong>}
       <div className="cal-head">
         <button className="cal-nav" onClick={() => shift(-1)} aria-label={t("Vorheriger Monat")}>‹</button>
         <strong className="cal-month">{month.toLocaleDateString(locale(), { month: "long", year: "numeric" })}</strong>

@@ -1,7 +1,6 @@
-import type { Project, Task } from "./data";
+import type { Task } from "./data";
 import { daysUntil, iso } from "./dates";
 import { lang, t } from "./i18n";
-import type { AnimalKind } from "./sprites";
 
 // Logbuch: Aufgaben mit Tag-Stempel (task.log = Tag, an dem sie angelegt wurden).
 // Offene Aufgaben vergangener Tage erscheinen einfach am heutigen Tag (Anzeige-Regel, die Daten bleiben),
@@ -12,7 +11,7 @@ export const isLog = (t: Task) => !!t.log && !t.parentId;
 
 export type LogDay = { created: Task[]; done: Task[] };
 
-// Alle Tage eines Projekts (oder aller Projekte) mit angelegten bzw. erledigten Logbuch-Aufgaben
+// Alle Tage mit angelegten bzw. erledigten Logbuch-Aufgaben (optional nur eines Projekts)
 export function logDays(tasks: Task[], projectId?: string) {
   const days = new Map<string, LogDay>();
   const at = (d: string) => {
@@ -43,27 +42,12 @@ export function sinceLabel(day: string) {
   return t("seit {d}", { d: lang() === "de" ? `${d}.${m}.` : `${m}/${d}` });
 }
 
-// Projektfarbe fürs Logbuch: je Tier gut unterscheidbar, gedämpft passend zur Waldpalette
-const LOG_COLORS: Record<AnimalKind, string> = {
-  beaver: "#7F4F24",
-  fox: "#C0612F",
-  squirrel: "#8A4A63",
-  raccoon: "#3E6A8A",
-  hedgehog: "#5C7A2E",
-  owl: "#5E5490",
-  rabbit: "#3F7A68",
-};
-export const projectColor = (p: Project) => LOG_COLORS[p.animal];
+// Farbe des Logbuchs (eins für alle Projekte), gedämpftes Blau passend zur Waldpalette
+export const LOG_COLOR = "#3E6A8A";
 
-// Punkte für den Hauptkalender: je Tag die Projekte mit Logbuch-Einträgen
-export type LogDot = { projectId: string; name: string; color: string; count: number };
-export function logDots(tasks: Task[], projects: Project[]): Record<string, LogDot[]> {
-  const out: Record<string, LogDot[]> = {};
-  for (const p of projects) {
-    if (p.logHidden) continue;
-    for (const [day, d] of logDays(tasks, p.id)) {
-      (out[day] ??= []).push({ projectId: p.id, name: p.name, color: projectColor(p), count: dayCount(d) });
-    }
-  }
+// Für den Hauptkalender: Anzahl Logbuch-Einträge je Tag
+export function logDots(tasks: Task[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [day, d] of logDays(tasks)) out[day] = dayCount(d);
   return out;
 }
