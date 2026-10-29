@@ -498,8 +498,16 @@ const EN: Record<string, string> = {
   "Vorrat ({s})": "Stash ({s})",
   "(dieses Tier sammelt nichts)": "(this animal does not collect anything)",
   "Einzelne Clips": "Single clips",
-  "Maus über das Tier bewegen: die Augen folgen. Stillhalten: es schmiegt sich an.":
-    "Move the mouse over the animal: its eyes follow. Hold still: it cuddles up.",
+  "Maus über das Tier bewegen: die Augen folgen. Stillhalten: es schmiegt sich an. Hin und her: streicheln.":
+    "Move the mouse over the animal: its eyes follow. Hold still: it cuddles up. Back and forth: pet it.",
+
+  // ---------- Streicheln ----------
+  "Hihi!": "Hehe!",
+  "Das tut gut!": "That feels nice!",
+  "Mehr davon!": "More, please!",
+  "Das kitzelt!": "That tickles!",
+  "Hach…": "Aww…",
+  "Schön!": "Lovely!",
 
   // ---------- Liste einfügen ----------
   "Liste einfügen…": "Paste list…",

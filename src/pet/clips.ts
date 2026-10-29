@@ -243,6 +243,19 @@ export function baseClips(_sp: Species): Record<string, Clip> {
         props: [["heart1"], ["heart1", "heart3"], ["heart2", "heart3"], ["heart2"], [], [], ["heart3"], ["heart3", "heart1"], ["heart1"]][i],
       })),
     },
+    // Gestreichelt werden: Augen zu, Bäckchen, Kopf wippt mit, ab und zu ein Herz.
+    // Neigung zur Hand ergänzt die Engine (hx/turn nach Strichrichtung).
+    pet: {
+      fps: 6,
+      frames: repeat(12, i => ({
+        hy: i % 3 === 0 ? 0 : 1,
+        eyes: "happy",
+        mouth: i % 6 < 3 ? "smile" : "small",
+        blush: true,
+        arms: "hold",
+        props: [[], ["heart1"], ["heart1"], ["heart2"], ["heart2"], [], [], ["heart3"], ["heart3"], ["heart3", "heart1"], ["heart1"], []][i],
+      })),
+    },
     // ---------- Besuch: zwei Tiere einander zugewandt (L = schaut nach links, R = nach rechts) ----------
     ...Object.fromEntries(
       (["L", "R"] as const).flatMap(side => {

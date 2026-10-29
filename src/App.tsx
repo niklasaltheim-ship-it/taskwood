@@ -404,6 +404,10 @@ export default function App() {
     lastEvent.current = ev;
     setPetEvent(ev);
   };
+  // Maus streicht über das Tier: manchmal ein Kommentar (nicht bei jedem Mal)
+  const petted = () => {
+    if (Math.random() < 0.6) say(t(pick(["Hihi!", "Das tut gut!", "Mehr davon!", "Das kitzelt!", "Hach…", "Schön!"])), REACT_GAP);
+  };
 
   const setTimer = (id: string, t: Timer | null) =>
     setData(d => {
@@ -1332,7 +1336,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           </div>
         )}
         <div className="pet" ref={n => void (dangle.current = n)}>
-          <Pet kind={shown?.animal ?? "beaver"} mood={mood} stash={stashOf(shown)} scale={3} event={petEvent} held={held} reduced={settings.calm} wear={wearFor(shown)} interactive />
+          <Pet kind={shown?.animal ?? "beaver"} mood={mood} stash={stashOf(shown)} scale={3} event={petEvent} held={held} reduced={settings.calm} wear={wearFor(shown)} interactive onPet={petted} />
           {shownCount > 0 && <span className="badge big">{shownCount > 99 ? "99+" : shownCount}</span>}
           {tm && (
             <span className={tm.endsAt ? "ring" : "ring paused"}>
@@ -1415,7 +1419,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
             title={t(task.sketch ? "Skizze öffnen" : "Skizzenfeld: zeichnen und schreiben")}
             aria-label={t("Skizze öffnen")}
           >
-            <svg viewBox="0 0 16 16"><path d="M10.5 2.5l3 3L6 13H3v-3zM9 4l3 3" /></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 2.5C4.7 2.5 2.5 4.9 2.5 7.9s2.4 5.6 5.3 5.6c1 0 1.4-.7 1-1.5-.4-.9.2-1.7 1.1-1.7h1.5c1.5 0 2.6-1.1 2.6-2.6 0-2.9-2.7-5.2-6-5.2zM5.4 8.2h.01M6.4 5.5h.01M9.5 5.1h.01M11.4 7.2h.01" /></svg>
           </button>
           <button
             className={detailsId === task.id ? "more on" : "more"}
@@ -1566,7 +1570,7 @@ ${t(lec.now ? "Jetzt" : "Als Nächstes")}: ${lec.lecture.title}, ${lec.lecture.r
           className={hop ? "bar-pet hop" : "bar-pet"}
           ref={n => void (dangle.current = n)}
         >
-          <Pet kind={theme} mood={moodOf(project)} scale={1} event={petEvent} held={held} reduced={settings.calm} wear={wearFor(project)} interactive />
+          <Pet kind={theme} mood={moodOf(project)} scale={1} event={petEvent} held={held} reduced={settings.calm} wear={wearFor(project)} interactive onPet={petted} />
           {count > 0 && <span className="badge">{count > 99 ? "99+" : count}</span>}
         </span>
         {visitorProject && visitor && (

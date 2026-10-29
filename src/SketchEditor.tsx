@@ -449,13 +449,13 @@ export default function SketchEditor({ title, sketch, onSave, onClose, onDrag }:
   return (
     <div className="sketch" onMouseDown={e => e.stopPropagation()}>
       <div className="sketch-bar" onMouseDown={e => !(e.target as HTMLElement).closest("button") && onDrag()}>
-        {icon("M10.5 2.5l3 3L6 13H3v-3z M9 4l3 3")}
+        {icon("M8 2.5C4.7 2.5 2.5 4.9 2.5 7.9s2.4 5.6 5.3 5.6c1 0 1.4-.7 1-1.5-.4-.9.2-1.7 1.1-1.7h1.5c1.5 0 2.6-1.1 2.6-2.6 0-2.9-2.7-5.2-6-5.2zM5.4 8.2h.01M6.4 5.5h.01M9.5 5.1h.01M11.4 7.2h.01")}
         <strong className="sketch-title" title={title}>{title}</strong>
         <button className="btn primary sketch-done" onClick={close}>{t("Fertig")}</button>
       </div>
       <div className="sketch-tools">
         <button className={tool === "pen" ? "s-btn on" : "s-btn"} onClick={() => setTool("pen")} title={t("Stift (P)")} aria-label={t("Stift (P)")}>
-          {icon("M10.5 2.5l3 3L6 13H3v-3z")}
+          {icon("M2.5 12.5c1.2-.6 1.8-3.6 3.4-5.2s2.8.8 4.2-.8 1.6-3 3.4-4")}
         </button>
         <button className={tool === "eraser" ? "s-btn on" : "s-btn"} onClick={() => { setTool("eraser"); setSel(null); }} title={t("Radierer (E)")} aria-label={t("Radierer (E)")}>
           {icon("M6 13.5h7.5M3.5 9.5l5-5.5 4.5 4.5-5 5.5H6z M6 7l4.5 4.5")}

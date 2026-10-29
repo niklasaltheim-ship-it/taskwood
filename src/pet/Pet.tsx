@@ -30,11 +30,15 @@ type Props = {
   reduced?: boolean; // Standbild erzwingen (sonst nach Systemeinstellung)
   forceHover?: boolean;
   forceCuddle?: boolean;
+  onPet?: () => void; // Streicheln hat begonnen (Maus hin und her über dem Tier)
   stash?: number; // erledigte Aufgaben der letzten Tage als Vorrat neben dem Tier
   wear?: Wear; // Accessoire und Jahreszeiten-Deko
 };
 
 const CUDDLE_AFTER = 1400; // ms Mausstillstand
+const PET_FLIPS = 3; // so viele Richtungswechsel kurz hintereinander gelten als Streicheln
+const PET_WINDOW = 1300; // ms, in denen die Richtungswechsel liegen müssen
+const PET_END = 900; // ms ohne neuen Strich: Streicheln vorbei
 const WAKE_MS = 20000; // so lange bleibt ein müdes Tier nach Erscheinen, Verschieben, Ereignis oder Maus wach
 const EVENT_FRESH = 2000; // ältere Ereignisse nicht nachspielen (z. B. nach Umschalten der Ansicht)
 const CROP = { x: 10, y: 12, w: 20, h: 19 };
@@ -53,9 +57,10 @@ export default function Pet(props: Props) {
   return <Engine sp={sp} {...props} />;
 }
 
-function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, crop, reduced, forceHover, forceCuddle, stash = 0, wear }: Props & { sp: Species }) {
+function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, crop, reduced, forceHover, forceCuddle, onPet, stash = 0, wear }: Props & { sp: Species }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const live = useRef({ mood, held, stash, wear, hover: false, cuddle: false, gaze: [0, 0] as [number, number] });
+  // pet/petDir: wird gerade gestreichelt, Richtung des letzten Strichs (-1 links, 1 rechts)
+  const live = useRef({ mood, held, stash, wear, hover: false, cuddle: false, pet: false, petDir: 1 as -1 | 1, gaze: [0, 0] as [number, number] });
   live.current.mood = mood;
   live.current.stash = stash;
   live.current.wear = wear;
@@ -101,6 +106,7 @@ function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, 
     if (l.held) return "held";
     if (l.mood === "alarm") return "alarm";
     if (l.mood === "event") return "appointment";
+    if (l.pet && sp.clips.pet) return "pet";
     if (l.hover && l.mood === "sleep") return "peek";
     if (l.cuddle && l.mood !== "sleep") return "cuddle";
     if (l.mood === "sleep") {
@@ -124,6 +130,8 @@ function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, 
     if (l.mood === "focus" && !s.event && s.clip === "work") {
       out = { ...out, brows: "focus", props: [...(out.props ?? []), "headband"] };
     }
+    // Beim Streicheln schmiegt sich der Kopf in die Richtung der Hand
+    if (s.clip === "pet") out = { ...out, hx: l.petDir, turn: l.petDir };
     const openEyes = !out.eyes || out.eyes === "bead";
     if (openEyes && l.hover && !s.event && s.clip !== "held") out = { ...out, gaze: l.gaze };
     const now = performance.now();
@@ -222,13 +230,54 @@ function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, 
   // ---------- Maus ----------
 
   const cuddleTimer = useRef(0);
+  // Streicheln: Mausweg je Richtung (anchor = Beginn des aktuellen Strichs), Zeitpunkte der Richtungswechsel
+  const stroke = useRef({ x: 0, anchor: 0, dir: 0, flips: [] as number[], end: 0 });
+  const stopPet = () => {
+    const l = live.current;
+    window.clearTimeout(stroke.current.end);
+    stroke.current.flips = [];
+    if (!l.pet) return;
+    l.pet = false;
+    // Hinterher noch eine Weile zufrieden wach
+    stayAwake("idle");
+    reconsider();
+  };
   const setHover = (h: boolean) => {
     const l = live.current;
     if (!h && l.hover && l.mood === "sleep") stayAwake("peek");
     if (forceHover === undefined) l.hover = h;
     if (!h && forceCuddle === undefined) l.cuddle = false;
     window.clearTimeout(cuddleTimer.current);
+    if (!h) stopPet();
     reconsider();
+  };
+  const trackStroke = (x: number, minTravel: number) => {
+    const l = live.current;
+    const k = stroke.current;
+    const dx = x - k.x;
+    k.x = x;
+    if (Math.abs(dx) < 1) return;
+    const dir = dx > 0 ? 1 : -1;
+    if (dir === k.dir) return;
+    // Richtungswechsel zählt nur nach einem richtigen Strich, nicht bei Zittern
+    const now = performance.now();
+    if (k.dir && Math.abs(x - k.anchor) >= minTravel) {
+      k.flips = [...k.flips.filter(t => now - t < PET_WINDOW), now];
+      l.petDir = k.dir as -1 | 1;
+      if (l.pet) {
+        window.clearTimeout(k.end);
+        k.end = window.setTimeout(stopPet, PET_END);
+      } else if (k.flips.length >= PET_FLIPS && !l.held) {
+        l.pet = true;
+        l.cuddle = false;
+        window.clearTimeout(k.end);
+        k.end = window.setTimeout(stopPet, PET_END);
+        reconsider();
+        onPet?.();
+      }
+    }
+    k.dir = dir;
+    k.anchor = x - dx;
   };
   const onMove = (e: ReactMouseEvent) => {
     const l = live.current;
@@ -240,7 +289,8 @@ function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, 
     const ty = r.height * 0.12;
     l.gaze = [dx > tx ? 1 : dx < -tx ? -1 : 0, dy > ty ? 1 : dy < -ty ? -1 : 0];
     if (!l.hover && forceHover === undefined) setHover(true);
-    if (forceCuddle !== undefined) return;
+    trackStroke(e.clientX, Math.max(4, r.width * 0.12));
+    if (forceCuddle !== undefined || l.pet) return;
     if (l.cuddle) {
       l.cuddle = false;
       reconsider();
@@ -253,7 +303,13 @@ function Engine({ sp, mood, scale = 1, event, held = false, interactive, still, 
     }, CUDDLE_AFTER);
   };
 
-  useEffect(() => () => window.clearTimeout(cuddleTimer.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(cuddleTimer.current);
+      window.clearTimeout(stroke.current.end);
+    },
+    []
+  );
 
   const w = crop ? CROP.w : W;
   const h = crop ? CROP.h : H;

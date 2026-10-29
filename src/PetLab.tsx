@@ -142,7 +142,7 @@ export default function PetLab({ kind: initial, onClose, onGame }: { kind: Anima
         <button className={logPreview ? "chip small on" : "chip small"} onClick={() => setLogPreview(v => !v)}>{t("Logbuch-Monat (Beispieldaten)")}</button>
       </div>
       {logPreview && <LogMonth tasks={sampleLog()} color={THEMES[kind].accent} />}
-      <p className="lab-note">{t("Maus über das Tier bewegen: die Augen folgen. Stillhalten: es schmiegt sich an.")}</p>
+      <p className="lab-note">{t("Maus über das Tier bewegen: die Augen folgen. Stillhalten: es schmiegt sich an. Hin und her: streicheln.")}</p>
     </div>
   );
 }
